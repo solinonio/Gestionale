@@ -11,6 +11,42 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.2.2",
+    date: "2026-07-17",
+    title: "Gestionale v3.2.2 - Nuova Repository GitHub di Default",
+    type: "patch",
+    changes: [
+      {
+        category: "improvement",
+        text: "Aggiornata la repository GitHub di default per gli aggiornamenti software a 'solinonio/Gestionale'."
+      },
+      {
+        category: "improvement",
+        text: "Ottimizzati i parametri di sistema per riflettere il nuovo percorso della repository."
+      }
+    ]
+  },
+  {
+    version: "3.2.1",
+    date: "2026-07-17",
+    title: "Gestionale v3.2.1 - Sicurezza e Streaming File NAS",
+    type: "patch",
+    changes: [
+      {
+        category: "feature",
+        text: "Implementato streaming PDF diretto e sicuro dal volume NAS (/Volumes/NAS/)."
+      },
+      {
+        category: "improvement",
+        text: "Aggiunto controllo preventivo per evitare attacchi di tipo Path Traversal sui percorsi dei file."
+      },
+      {
+        category: "improvement",
+        text: "Aggiornato il codice per visualizzare ed allineare correttamente il numero di versione 3.2.1 nell'interfaccia utente."
+      }
+    ]
+  },
+  {
     version: "3.19.0",
     date: "2026-07-17",
     title: "Gestionale v3.19.0 - Semplificazione Allegati e Collegamento NAS Automatico",

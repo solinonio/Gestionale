@@ -1451,7 +1451,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
       const url = `https://api.github.com/repos/${repo}/git/trees/${branch}?recursive=1`;
       const headers: HeadersInit = {
         'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'Gestionale-Preventivi-Updater'
+        'User-Agent': 'Gestionale-Updater'
       };
       if (token && token.trim() !== '') {
         headers['Authorization'] = `token ${token}`;
@@ -1557,7 +1557,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     try {
       const headers: HeadersInit = {
         'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': 'Gestionale-Preventivi-Updater'
+        'User-Agent': 'Gestionale-Updater'
       };
       if (token && token.trim() !== '') {
         headers['Authorization'] = `token ${token}`;

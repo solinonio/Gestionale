@@ -20,7 +20,7 @@ export interface SyncData {
 
 const DEFAULT_CONFIG: GitHubConfig = {
   token: '',
-  repo: 'solinonio/Gestionale-Preventivi',
+  repo: 'solinonio/Gestionale',
   filePath: 'data/db.json',
   branch: 'main',
   autoSync: false
@@ -283,7 +283,7 @@ export const pullFromGitHub = async (
   }
 };
 
-export const CURRENT_VERSION = "3.19.0";
+export const CURRENT_VERSION = "3.2.2";
 
 export const isVersionOlder = (local: string, remote: string): boolean => {
   const localParts = local.replace(/^v/i, '').split('.').map(Number);

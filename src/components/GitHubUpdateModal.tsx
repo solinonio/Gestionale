@@ -33,7 +33,7 @@ interface Props {
 }
 
 export default function GitHubUpdateModal({ isOpen, onClose, onUpdateSuccess }: Props) {
-  const [repo, setRepo] = useState('solinonio/Gestionale-Preventivi');
+  const [repo, setRepo] = useState('solinonio/Gestionale');
   const [token, setToken] = useState('');
   const [branch, setBranch] = useState('main');
   const [showToken, setShowToken] = useState(false);
