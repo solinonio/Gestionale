@@ -1,0 +1,6 @@
+{
+  "name": "Gestionale",
+  "description": "Un sistema gestionale per la creazione di preventivi con catalogo dei costi storico.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

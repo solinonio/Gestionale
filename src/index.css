@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* Rendi le sliderbar più visibili con indicatore molto scuro e traccia marcata */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  background: #cbd5e1; /* slate-300: traccia molto più visibile */
+  border-radius: 4px;
+  outline: none;
+  transition: background 0.15s ease;
+}
+
+/* Traccia per aree scure */
+.bg-gray-900 input[type="range"],
+.bg-gray-950 input[type="range"],
+.dark input[type="range"] {
+  background: #475569; /* slate-600 */
+}
+
+/* Thumb/Indicator - Webkit */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0f172a !important; /* slate-900: molto scuro */
+  border: 2px solid #ffffff !important;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: background 0.15s ease, transform 0.1s ease;
+  margin-top: -6px; /* center it if track height is smaller */
+}
+
+/* Fix margin-top on custom styling if height is already 8px */
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: #020617 !important;
+  transform: scale(1.15);
+}
+
+/* Thumb/Indicator - Firefox */
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0f172a !important; /* slate-900: molto scuro */
+  border: 2px solid #ffffff !important;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  background: #020617 !important;
+  transform: scale(1.15);
+}
+
