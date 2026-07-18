@@ -90,6 +90,7 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [viewerPdfPath, setViewerPdfPath] = useState<string>('');
   const [isNasConnected, setIsNasConnected] = useState(false);
+  const [nasRootPath, setNasRootPath] = useState(localStorage.getItem('nas_root_path') || '\\\\NAS\\Preventivi\\');
 
   useEffect(() => {
     getNasFolderHandle().then(handle => {
@@ -98,10 +99,28 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
   }, []);
 
   const handleConnectNas = async () => {
-    const success = await connectNasFolder();
-    if (success) {
+    const handle = await connectNasFolder();
+    if (handle) {
       setIsNasConnected(true);
-      alert("Cartella NAS connessa con successo!");
+      
+      // Tentiamo di suggerire un percorso basato sul nome della cartella selezionata
+      const folderName = handle.name;
+      const suggestion = `\\\\NAS\\${folderName}\\`;
+      
+      const manualPath = prompt(
+        `Cartella NAS "${folderName}" connessa!\n\nPer favore, conferma o inserisci il percorso di rete completo (es. \\\\NAS\\Preventivi\\):`, 
+        localStorage.getItem('nas_root_path') || suggestion
+      );
+      
+      if (manualPath) {
+        localStorage.setItem('nas_root_path', manualPath);
+        setNasRootPath(manualPath);
+        
+        // Se c'è già un file selezionato, aggiorna il suo percorso
+        if (localAttachmentName) {
+          setLocalAttachmentPath(`${manualPath}${localAttachmentName}`);
+        }
+      }
     }
   };
 
@@ -544,11 +563,13 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
                               type="text" 
                               placeholder="Es: \\NAS\Preventivi\"
                               className="w-full bg-white border border-blue-200 rounded px-2.5 py-1.5 text-xs font-mono focus:ring-1 focus:ring-blue-500 outline-none"
-                              defaultValue={localStorage.getItem('nas_root_path') || '\\\\NAS\\Preventivi\\'}
+                              value={nasRootPath}
                               onChange={(e) => {
-                                localStorage.setItem('nas_root_path', e.target.value);
+                                const newPath = e.target.value;
+                                setNasRootPath(newPath);
+                                localStorage.setItem('nas_root_path', newPath);
                                 if (localAttachmentName) {
-                                  setLocalAttachmentPath(`${e.target.value}${localAttachmentName}`);
+                                  setLocalAttachmentPath(`${newPath}${localAttachmentName}`);
                                 }
                               }}
                             />

@@ -77,6 +77,7 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [activeViewerPath, setActiveViewerPath] = useState<string | null>(null);
   const [isNasConnected, setIsNasConnected] = useState(false);
+  const [nasRootPath, setNasRootPath] = useState(localStorage.getItem('nas_root_path') || '\\\\NAS\\Preventivi\\');
 
   useEffect(() => {
     getNasFolderHandle().then(handle => {
@@ -85,10 +86,23 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
   }, []);
 
   const handleConnectNas = async () => {
-    const success = await connectNasFolder();
-    if (success) {
+    const handle = await connectNasFolder();
+    if (handle) {
       setIsNasConnected(true);
-      alert("Cartella NAS connessa con successo!");
+      
+      // Tentiamo di suggerire un percorso basato sul nome della cartella selezionata
+      const folderName = handle.name;
+      const suggestion = `\\\\NAS\\${folderName}\\`;
+      
+      const manualPath = prompt(
+        `Cartella NAS "${folderName}" connessa!\n\nPer favore, conferma o inserisci il percorso di rete completo (es. \\\\NAS\\Preventivi\\):`, 
+        localStorage.getItem('nas_root_path') || suggestion
+      );
+      
+      if (manualPath) {
+        localStorage.setItem('nas_root_path', manualPath);
+        setNasRootPath(manualPath);
+      }
     }
   };
 
@@ -1579,7 +1593,7 @@ Ecco il testo del PDF da analizzare:
                                 const files = (e.target as HTMLInputElement).files;
                                 if (files) {
                                   const newPaths: string[] = [];
-                                  const root = localStorage.getItem('nas_root_path') || '\\\\NAS\\Preventivi\\';
+                                  const root = nasRootPath;
                                   for (let i = 0; i < files.length; i++) {
                                     const fileName = files[i].name;
                                     const fullPath = `${root}${fileName}`;
@@ -1623,8 +1637,12 @@ Ecco il testo del PDF da analizzare:
                             type="text" 
                             placeholder="Es: \\NAS\Preventivi\"
                             className="w-full bg-white border border-blue-200 rounded px-2 py-1 text-xs font-mono"
-                            defaultValue={localStorage.getItem('nas_root_path') || '\\\\NAS\\Preventivi\\'}
-                            onChange={(e) => localStorage.setItem('nas_root_path', e.target.value)}
+                            value={nasRootPath}
+                            onChange={(e) => {
+                              const newPath = e.target.value;
+                              setNasRootPath(newPath);
+                              localStorage.setItem('nas_root_path', newPath);
+                            }}
                           />
                         </div>
                         <p className="text-[9px] text-blue-600 max-w-[200px] leading-tight italic">

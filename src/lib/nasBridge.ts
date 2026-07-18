@@ -13,11 +13,11 @@ const DIR_HANDLE_KEY = 'nas_directory_handle';
  * Richiede all'utente di selezionare la cartella principale del NAS.
  * Salva l'handle in IndexedDB per riutilizzarlo nelle sessioni successive.
  */
-export async function connectNasFolder(): Promise<boolean> {
+export async function connectNasFolder(): Promise<any | null> {
   try {
     if (!('showDirectoryPicker' in window)) {
       alert("Il tuo browser non supporta la File System Access API. Usa Chrome o Edge.");
-      return false;
+      return null;
     }
 
     const handle = await (window as any).showDirectoryPicker({
@@ -25,10 +25,10 @@ export async function connectNasFolder(): Promise<boolean> {
     });
     
     await set(DIR_HANDLE_KEY, handle);
-    return true;
+    return handle;
   } catch (err) {
     console.error("Errore durante la connessione alla cartella NAS:", err);
-    return false;
+    return null;
   }
 }
 
