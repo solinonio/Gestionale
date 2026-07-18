@@ -1527,156 +1527,27 @@ Ecco il testo del PDF da analizzare:
                     Questo pannello ti consente di associare molteplici file PDF o collegamenti di rete locale (NAS) a questo preventivo. Puoi scegliere un file dal computer per copiare automaticamente il percorso consigliato negli appunti, oppure inserire manualmente qualsiasi percorso o indirizzo web.
                   </p>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    {/* Left Column: Local File Selector & Path Generator */}
-                    <div className="lg:col-span-5 bg-white p-5 rounded-lg border border-gray-300 space-y-5 flex flex-col justify-between">
-                      <div className="space-y-5">
-                        <div className="space-y-3 pb-4 border-b border-gray-200">
-                          <label className="block text-xs font-bold text-purple-800 uppercase tracking-wider">
-                            Metodo A: Selettore Assistito PDF Locale
-                          </label>
-                          <p className="text-[11px] text-gray-550 leading-tight">
-                            Seleziona un file PDF per generare e copiare automaticamente negli appunti un percorso di rete NAS consigliato.
-                          </p>
-                          
-                          <div className="flex items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={() => document.getElementById('local-pdf-picker')?.click()}
-                              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg text-xs transition-all cursor-pointer inline-flex items-center gap-2 shadow-xs"
-                            >
-                              <FileUp size={16} />
-                              <span>Sfoglia File...</span>
-                            </button>
-                            
-                            <input
-                              type="file"
-                              id="local-pdf-picker"
-                              accept="application/pdf"
-                              className="hidden"
-                              onChange={handleLocalFileSelect}
-                            />
-
-                            {selectedFileName && (
-                              <span className="text-xs font-semibold text-gray-700 truncate max-w-[150px] bg-purple-50 px-2 py-1 rounded" title={selectedFileName}>
-                                {selectedFileName}
-                              </span>
-                            )}
-                          </div>
-
-                          {selectedFileName && (
-                            <div className="space-y-3 pt-2 animate-fade-in">
-                              <div className="p-3 bg-purple-50 rounded-lg border border-purple-200 text-purple-950 space-y-1.5">
-                                <span className="block text-[10px] font-bold uppercase tracking-wider text-purple-850">
-                                  Percorso Rete Calcolato (Copiato)
-                                </span>
-                                <div className="flex gap-2">
-                                  <input
-                                    type="text"
-                                    className="flex-1 bg-white border border-purple-300 rounded px-2.5 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-purple-500 text-gray-900"
-                                    value={stagedLocalPath}
-                                    onChange={(e) => setStagedLocalPath(e.target.value)}
-                                    placeholder="Percorso NAS del file"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(stagedLocalPath);
-                                      setPathCopiedFeedback(true);
-                                      setTimeout(() => setPathCopiedFeedback(false), 3000);
-                                    }}
-                                    className="bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-300 rounded px-2.5 py-1 text-xs font-semibold cursor-pointer"
-                                  >
-                                    Copia
-                                  </button>
-                                </div>
-                                {pathCopiedFeedback && (
-                                  <p className="text-[10px] text-green-700 font-bold flex items-center gap-1">
-                                    ✓ Copiato negli appunti automaticamente!
-                                  </p>
-                                )}
-                              </div>
-
-                              <div className="pt-1">
-                                <button
-                                  type="button"
-                                  onClick={handleConfirmLocalPath}
-                                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg text-xs transition-all cursor-pointer inline-flex items-center justify-center gap-2 shadow-xs"
-                                >
-                                  <Check size={14} />
-                                  <span>Associa e Aggiungi alla Lista</span>
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="space-y-3">
-                          <label className="block text-xs font-bold text-blue-800 uppercase tracking-wider">
-                            Metodo B: Incolla Percorso NAS o Link Web
-                          </label>
-                          <p className="text-[11px] text-gray-550 leading-tight">
-                            Digita o incolla direttamente un percorso locale, una cartella condivisa di rete, o un URL internet.
-                          </p>
-                          
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={nasPathInput}
-                              onChange={(e) => setNasPathInput(e.target.value)}
-                              placeholder="Es. \\NAS\preventivi\documento.pdf o https://..."
-                              className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium text-gray-900 font-mono"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!nasPathInput.trim()) {
-                                  alert("Inserisci prima un percorso o URL valido.");
-                                  return;
-                                }
-                                const val = nasPathInput.trim();
-                                if (attachmentsList.includes(val)) {
-                                  alert("Questo percorso è già presente nella lista.");
-                                  return;
-                                }
-                                setAttachmentsList(prev => [...prev, val]);
-                                setNasPathInput('');
-                                alert("Collegamento aggiunto con successo alla lista!");
-                              }}
-                              className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-1.5 rounded-lg text-xs transition-colors cursor-pointer shrink-0"
-                            >
-                              Aggiungi
-                            </button>
-                          </div>
-                        </div>
+                  <div className="bg-white p-5 rounded-lg border border-gray-300">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center pb-2 border-b border-gray-200">
+                        <h4 className="font-bold text-xs text-blue-800 uppercase tracking-wider flex items-center gap-2">
+                          <Paperclip size={14} />
+                          Lista Allegati Associati ({attachmentsList.length})
+                        </h4>
+                        {attachmentsList.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm("Sei sicuro di voler rimuovere TUTTI gli allegati?")) {
+                                setAttachmentsList([]);
+                              }
+                            }}
+                            className="text-[10px] font-bold text-red-600 hover:text-red-800 transition-colors cursor-pointer"
+                          >
+                            Svuota tutto
+                          </button>
+                        )}
                       </div>
-
-                      <div className="pt-4 border-t border-gray-150 text-[10px] text-gray-500 leading-relaxed">
-                        Nota: I file locali e di rete non vengono fisicamente caricati sul server web per preservare privacy e risorse. Viene salvato esclusivamente il percorso del file (il link testuale) nel database.
-                      </div>
-                    </div>
-
-                    {/* Right Column: Attachments List & Multi-actions */}
-                    <div className="lg:col-span-7 bg-white p-5 rounded-lg border border-gray-300 flex flex-col justify-between">
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center pb-2 border-b border-gray-200">
-                          <h4 className="font-bold text-xs text-gray-500 uppercase tracking-wider">
-                            Lista Allegati Correnti ({attachmentsList.length})
-                          </h4>
-                          {attachmentsList.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (confirm("Sei sicuro di voler rimuovere TUTTI gli allegati?")) {
-                                  setAttachmentsList([]);
-                                }
-                              }}
-                              className="text-[10px] font-bold text-red-600 hover:text-red-800 transition-colors cursor-pointer"
-                            >
-                              Svuota tutto
-                            </button>
-                          )}
-                        </div>
 
                         {attachmentsList.length > 0 ? (
                           <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
@@ -1776,7 +1647,6 @@ Ecco il testo del PDF da analizzare:
                       </div>
                     </div>
                   </div>
-                </div>
             )}
 
         </div>

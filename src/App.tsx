@@ -135,6 +135,16 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Sincronizzazione dati con il server ogni volta che si cambia tab per le pagine principali
+  useEffect(() => {
+    const syncPages = ['home', 'quotations', 'anagrafiche', 'laser', 'materiali'];
+    if (syncPages.includes(activeTab)) {
+      syncWithServer(true).catch(err => {
+        console.warn("Sincronizzazione durante la navigazione fallita:", err);
+      });
+    }
+  }, [activeTab]);
+
   // Initialize and load the database file on startup
   useEffect(() => {
     async function initDb() {

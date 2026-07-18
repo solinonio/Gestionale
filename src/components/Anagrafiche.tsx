@@ -623,31 +623,10 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
 
                   <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
                     {/* Caricamento (Left Panel) */}
-                    <div className="xl:col-span-5 bg-gray-50 p-6 rounded-lg border border-gray-200 space-y-4">
-                      <h4 className="font-bold text-sm text-gray-800 uppercase tracking-wider">Associa Nuovo Allegato</h4>
+                    <div className="xl:col-span-12 bg-gray-50 p-6 rounded-lg border border-gray-200 space-y-4">
+                      <h4 className="font-bold text-sm text-gray-800 uppercase tracking-wider">Dettagli Ultimo Allegato Associato</h4>
                       
-                      <div className="space-y-1">
-                        <label className="block text-sm font-medium text-gray-700">Seleziona File PDF <span className="text-red-500">*</span></label>
-                        <input 
-                          type="file" 
-                          accept="application/pdf" 
-                          onChange={handleLocalFileChange} 
-                          disabled={isUploading}
-                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50" 
-                        />
-                        {isUploading && (
-                          <div className="flex items-center gap-2 text-xs text-blue-600 font-semibold mt-1">
-                            <Loader2 size={14} className="animate-spin" /> Caricamento in corso...
-                          </div>
-                        )}
-                        {localAttachmentPath && (
-                          <p className="text-xs text-green-600 font-semibold mt-1">
-                            File pronto: {localAttachmentName}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1">
                           <label className="block text-sm font-medium text-gray-700">Data Preventivo <span className="text-red-500">*</span></label>
                           <input 
@@ -668,207 +647,25 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
                             className="w-full p-2 border border-gray-300 rounded bg-white text-gray-900 text-sm focus:ring-2 focus:ring-blue-500"
                           />
                         </div>
+
+                        <div className="space-y-1">
+                          <label className="block text-sm font-medium text-gray-700">Importo (€) <span className="text-red-500">*</span></label>
+                          <input 
+                            type="number"
+                            step="0.01"
+                            placeholder="es. 1250.00"
+                            value={attachmentDetails.amount}
+                            onChange={(e) => setAttachmentDetails({ ...attachmentDetails, amount: e.target.value })}
+                            className="w-full p-2 border border-gray-300 rounded bg-white text-gray-900 text-sm focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="block text-sm font-medium text-gray-700">Importo (€) <span className="text-red-500">*</span></label>
-                        <input 
-                          type="number"
-                          step="0.01"
-                          placeholder="es. 1250.00"
-                          value={attachmentDetails.amount}
-                          onChange={(e) => setAttachmentDetails({ ...attachmentDetails, amount: e.target.value })}
-                          className="w-full p-2 border border-gray-300 rounded bg-white text-gray-900 text-sm focus:ring-2 focus:ring-blue-500"
-                        />
+                      <div className="pt-4 border-t border-gray-200">
+                        <p className="text-xs text-gray-500 italic">
+                          Nota: Il caricamento diretto di file PDF è stato disabilitato. Utilizza i collegamenti per gestire i documenti.
+                        </p>
                       </div>
-
-                      <button
-                        type="button"
-                        onClick={handleSaveAttachment}
-                        disabled={isUploading || !localAttachmentPath}
-                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-semibold py-2 rounded transition-colors text-sm shrink-0 cursor-pointer"
-                      >
-                        Salva Allegato e Crea Preventivo
-                      </button>
-                    </div>
-
-                    {/* Tabella Allegati (Right Panel) */}
-                    <div className="xl:col-span-7 bg-gray-50 p-6 rounded-lg border border-gray-200 space-y-4">
-                      <h4 className="font-bold text-sm text-gray-800 uppercase tracking-wider">
-                        Elenco Allegati Caricati ({clientAttachments.length})
-                      </h4>
-
-                      {clientAttachments.length > 0 ? (
-                        <div className="overflow-x-auto border border-gray-300 rounded-lg">
-                          <table className="min-w-full divide-y divide-gray-300 bg-white text-xs md:text-sm">
-                            <thead className="bg-gray-100 text-gray-700 uppercase text-[10px] md:text-xs font-bold">
-                              <tr>
-                                <th className="px-3 py-2 text-left">File PDF</th>
-                                <th className="px-3 py-2 text-left">Data</th>
-                                <th className="px-3 py-2 text-left">Prog.</th>
-                                <th className="px-3 py-2 text-right">Importo</th>
-                                <th className="px-3 py-2 text-center">Azioni</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 text-gray-900">
-                              {clientAttachments.map((att) => {
-                                const isEditing = editingAttachmentId === att.id;
-                                return (
-                                  <tr key={att.id} className={`hover:bg-gray-50 ${isEditing ? 'bg-amber-50/50' : ''}`}>
-                                    <td className="px-3 py-2 font-medium truncate max-w-[150px]" title={att.filename}>
-                                      <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-1.5">
-                                          <FileText className="text-red-600 shrink-0" size={14} />
-                                          <span className="truncate">
-                                            {isEditing && editingAttachmentFilename ? editingAttachmentFilename : att.filename}
-                                          </span>
-                                        </div>
-                                        {isEditing && (
-                                          <label className="text-[10px] text-blue-600 hover:text-blue-800 cursor-pointer underline flex items-center gap-1">
-                                            <span>Sostituisci PDF</span>
-                                            <input
-                                              type="file"
-                                              accept="application/pdf"
-                                              className="hidden"
-                                              onChange={handleEditFileChange}
-                                            />
-                                          </label>
-                                        )}
-                                      </div>
-                                    </td>
-                                    <td className="px-3 py-2 whitespace-nowrap">
-                                      {isEditing ? (
-                                        <input
-                                          type="date"
-                                          value={editingDetails.date}
-                                          onChange={(e) => setEditingDetails({ ...editingDetails, date: e.target.value })}
-                                          className="p-1 border border-gray-300 rounded text-xs bg-white text-gray-900 w-full focus:ring-1 focus:ring-blue-500"
-                                        />
-                                      ) : (
-                                        att.date ? att.date.split('-').reverse().join('/') : '-'
-                                      )}
-                                    </td>
-                                    <td className="px-3 py-2 font-semibold text-blue-900 whitespace-nowrap">
-                                      {isEditing ? (
-                                        <input
-                                          type="text"
-                                          value={editingDetails.progressive}
-                                          onChange={(e) => setEditingDetails({ ...editingDetails, progressive: e.target.value })}
-                                          className="p-1 border border-gray-300 rounded text-xs bg-white text-gray-900 w-28 focus:ring-1 focus:ring-blue-500 font-semibold"
-                                        />
-                                      ) : (
-                                        att.progressive
-                                      )}
-                                    </td>
-                                    <td className="px-3 py-2 text-right font-bold whitespace-nowrap">
-                                      {isEditing ? (
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          value={editingDetails.amount}
-                                          onChange={(e) => setEditingDetails({ ...editingDetails, amount: e.target.value })}
-                                          className="p-1 border border-gray-300 rounded text-xs bg-white text-gray-900 w-24 text-right focus:ring-1 focus:ring-blue-500 font-bold"
-                                        />
-                                      ) : (
-                                        `€ ${att.amount.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                      )}
-                                    </td>
-                                    <td className="px-3 py-2 whitespace-nowrap text-center">
-                                      {isEditing ? (
-                                        <div className="flex justify-center gap-1.5">
-                                          <button
-                                            type="button"
-                                            onClick={() => handleUpdateAttachment(att.id)}
-                                            className="p-1 text-green-600 hover:text-green-900 hover:bg-green-100 rounded transition-all cursor-pointer"
-                                            title="Salva modifiche"
-                                          >
-                                            <Check size={14} className="stroke-[3]" />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => setEditingAttachmentId(null)}
-                                            className="p-1 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded transition-all cursor-pointer"
-                                            title="Annulla"
-                                          >
-                                            <X size={14} />
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <div className="flex justify-center gap-1.5">
-                                          {/* Icona 1: Modifica campi (progressivo, data, importo) */}
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setEditingAttachmentId(att.id);
-                                              setEditingDetails({
-                                                date: att.date || '',
-                                                progressive: att.progressive || '',
-                                                amount: att.amount ? att.amount.toString() : ''
-                                              });
-                                              setEditingAttachmentPath(att.path || '');
-                                              setEditingAttachmentFilename(att.filename || '');
-                                            }}
-                                            className="p-1 text-amber-600 hover:text-amber-900 hover:bg-amber-100 rounded transition-all cursor-pointer"
-                                            title="Modifica campi (Progressivo, Data, Importo)"
-                                          >
-                                            <Pencil size={14} />
-                                          </button>
-
-                                          {/* Icona 2: Aggiorna / ricarica il file PDF già allegato */}
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              document.getElementById(`direct-replace-pdf-${att.id}`)?.click();
-                                            }}
-                                            className="p-1 text-indigo-600 hover:text-indigo-900 hover:bg-indigo-100 rounded transition-all cursor-pointer"
-                                            title="Aggiorna / Ricarica PDF"
-                                          >
-                                            <FileUp size={14} />
-                                          </button>
-                                          <input
-                                            type="file"
-                                            id={`direct-replace-pdf-${att.id}`}
-                                            accept="application/pdf"
-                                            className="hidden"
-                                            onChange={(e) => handleDirectPdfReplace(e, att.id)}
-                                          />
-
-                                          {/* Altre azioni esistenti */}
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              setViewerPdfPath(att.path);
-                                              setIsViewerOpen(true);
-                                            }}
-                                            className="p-1 text-blue-600 hover:text-blue-900 hover:bg-blue-100 rounded transition-all cursor-pointer"
-                                            title="Apri PDF"
-                                          >
-                                            <Eye size={14} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleDeleteAttachment(att.id)}
-                                            className="p-1 text-red-600 hover:text-red-900 hover:bg-red-100 rounded transition-all cursor-pointer"
-                                            title="Rimuovi"
-                                          >
-                                            <Trash2 size={14} />
-                                          </button>
-                                        </div>
-                                      )}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div className="text-center py-12 text-gray-500 bg-white border border-dashed border-gray-300 rounded-lg">
-                          <Paperclip size={36} className="mx-auto text-gray-400 mb-2" />
-                          <p className="text-sm font-medium">Nessun file PDF allegato</p>
-                          <p className="text-xs mt-0.5">Usa il modulo a sinistra per caricare un PDF.</p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
