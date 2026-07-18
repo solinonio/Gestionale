@@ -107,20 +107,15 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
       const folderName = handle.name;
       const suggestion = `\\\\NAS\\${folderName}\\`;
       
-      const manualPath = prompt(
-        `Cartella NAS "${folderName}" connessa!\n\nPer favore, conferma o inserisci il percorso di rete completo (es. \\\\NAS\\Preventivi\\):`, 
-        localStorage.getItem('nas_root_path') || suggestion
-      );
+      // Aggiorna direttamente la radice senza prompt, come richiesto dall'utente
+      localStorage.setItem('nas_root_path', suggestion);
+      setNasRootPath(suggestion);
       
-      if (manualPath) {
-        localStorage.setItem('nas_root_path', manualPath);
-        setNasRootPath(manualPath);
-        
-        // Se c'è già un file selezionato, aggiorna il suo percorso
-        if (localAttachmentName) {
-          setLocalAttachmentPath(`${manualPath}${localAttachmentName}`);
-        }
+      if (localAttachmentName) {
+        setLocalAttachmentPath(`${suggestion}${localAttachmentName}`);
       }
+      
+      alert(`Cartella NAS "${folderName}" connessa e impostata come radice!`);
     }
   };
 
@@ -539,7 +534,7 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
                               input.onchange = (e) => {
                                 const file = (e.target as HTMLInputElement).files?.[0];
                                 if (file) {
-                                  const root = localStorage.getItem('nas_root_path') || '\\\\NAS\\Preventivi\\';
+                                  const root = nasRootPath;
                                   const fullPath = `${root}${file.name}`;
                                   setLocalAttachmentPath(fullPath);
                                   setLocalAttachmentName(file.name);
