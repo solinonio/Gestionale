@@ -15,10 +15,13 @@ import {
   Check,
   Pencil,
   X,
-  FileUp
+  FileUp,
+  FolderOpen,
+  Settings
 } from 'lucide-react';
 import { Client, ClientAttachment } from '../types';
 import { updateClient, saveQuotation, getCompanyProfile } from '../lib/db';
+import { connectNasFolder, getFileFromNas, getNasFolderHandle, verifyNasPermission } from '../lib/nasBridge';
 
 interface Props {
   setActiveTab: (tab: 'home' | 'quotations' | 'anagrafiche' | 'laser' | 'ai') => void;
@@ -86,6 +89,40 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
   const [isUploading, setIsUploading] = useState(false);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [viewerPdfPath, setViewerPdfPath] = useState<string>('');
+  const [isNasConnected, setIsNasConnected] = useState(false);
+
+  useEffect(() => {
+    getNasFolderHandle().then(handle => {
+      setIsNasConnected(!!handle);
+    });
+  }, []);
+
+  const handleConnectNas = async () => {
+    const success = await connectNasFolder();
+    if (success) {
+      setIsNasConnected(true);
+      alert("Cartella NAS connessa con successo!");
+    }
+  };
+
+  const handleViewPdf = async (path: string) => {
+    try {
+      setIsUploading(true);
+      const file = await getFileFromNas(path);
+      if (file) {
+        const url = URL.createObjectURL(file);
+        setViewerPdfPath(url);
+        setIsViewerOpen(true);
+      } else {
+        alert("Impossibile trovare il file sul NAS. Verifica che la cartella NAS sia connessa e il percorso sia corretto.");
+      }
+    } catch (err) {
+      console.error("Errore visualizzazione PDF:", err);
+      alert("Errore durante l'apertura del PDF.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // Editing attachment state
   const [editingAttachmentId, setEditingAttachmentId] = useState<string | null>(null);
@@ -98,178 +135,31 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
     setLocalAttachmentPath(null);
     setLocalAttachmentName(null);
     setEditingAttachmentId(null);
-    setAttachmentDetails({
-      date: new Date().toISOString().split('T')[0],
-      progressive: '',
-      amount: ''
-    });
-  };
-
-  const handleLocalFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== "application/pdf") {
-      alert("Formato non valido. Sono ammessi solo file PDF.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("pdf", file);
-
-    try {
-      setIsUploading(true);
-      const response = await fetch("/api/upload-pdf", {
-        method: "POST",
-        body: formData,
+    
+    if (client) {
+      // Pre-fill with last attachment data if available
+      setAttachmentDetails({
+        date: client.attachmentDate || new Date().toISOString().split('T')[0],
+        progressive: client.attachmentProgressive || '',
+        amount: client.attachmentAmount ? client.attachmentAmount.toString() : ''
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
+      if (client.attachmentPath) {
+        setLocalAttachmentPath(client.attachmentPath);
+        setLocalAttachmentName(client.attachmentPath.split(/[\\/]/).pop() || null);
       }
-
-      const result = await response.json();
-      if (result.success) {
-        setLocalAttachmentPath(result.path);
-        setLocalAttachmentName(file.name);
-      } else {
-        alert("Errore caricamento: " + result.error);
-      }
-    } catch (err) {
-      console.error("Errore upload:", err);
-      alert(`Errore durante l'invio del file: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleEditFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== "application/pdf") {
-      alert("Formato non valido. Sono ammessi solo file PDF.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("pdf", file);
-
-    try {
-      setIsUploading(true);
-      const response = await fetch("/api/upload-pdf", {
-        method: "POST",
-        body: formData,
+    } else {
+      setAttachmentDetails({
+        date: new Date().toISOString().split('T')[0],
+        progressive: '',
+        amount: ''
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
-      }
-
-      const result = await response.json();
-      if (result.success) {
-        setEditingAttachmentPath(result.path);
-        setEditingAttachmentFilename(file.name);
-      } else {
-        alert("Errore caricamento: " + result.error);
-      }
-    } catch (err) {
-      console.error("Errore upload:", err);
-      alert(`Errore durante l'invio del file: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDirectPdfReplace = async (e: React.ChangeEvent<HTMLInputElement>, attachmentId: string) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== "application/pdf") {
-      alert("Formato non valido. Sono ammessi solo file PDF.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("pdf", file);
-
-    try {
-      setIsUploading(true);
-      const response = await fetch("/api/upload-pdf", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
-      }
-
-      const result = await response.json();
-      if (result.success) {
-        if (!selectedClient) return;
-
-        const isLegacy = attachmentId === 'legacy-attachment';
-        const currentAttachments = [...(selectedClient.attachments || [])];
-
-        let updatedAttachments = [...currentAttachments];
-        if (!isLegacy) {
-          updatedAttachments = currentAttachments.map(att => {
-            if (att.id === attachmentId) {
-              return {
-                ...att,
-                path: result.path,
-                filename: file.name
-              };
-            }
-            return att;
-          });
-        }
-
-        let mainPath = isLegacy ? result.path : selectedClient.attachmentPath;
-        let mainDate = selectedClient.attachmentDate;
-        let mainProg = selectedClient.attachmentProgressive;
-        let mainAmount = selectedClient.attachmentAmount;
-
-        if (!isLegacy && updatedAttachments.length > 0) {
-          const last = updatedAttachments[updatedAttachments.length - 1];
-          mainPath = last.path;
-          mainDate = last.date;
-          mainProg = last.progressive;
-          mainAmount = last.amount;
-        }
-
-        const updatedClient: Client = {
-          ...selectedClient,
-          attachments: isLegacy ? undefined : updatedAttachments,
-          attachmentPath: mainPath,
-          attachmentDate: mainDate,
-          attachmentProgressive: mainProg,
-          attachmentAmount: mainAmount
-        };
-
-        await updateClient(selectedClient.id, updatedClient);
-        setSelectedClient(updatedClient);
-        alert('File PDF ricaricato con successo!');
-        window.dispatchEvent(new CustomEvent('database-synced'));
-      } else {
-        alert("Errore caricamento: " + result.error);
-      }
-    } catch (err) {
-      console.error("Errore upload:", err);
-      alert(`Errore durante il caricamento: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsUploading(false);
-      if (e.target) e.target.value = '';
     }
   };
 
   const handleSaveAttachment = async () => {
     if (!selectedClient) return;
     if (!localAttachmentPath) {
-      alert("Carica prima un file PDF!");
+      alert("Seleziona prima un file dal NAS!");
       return;
     }
     if (!attachmentDetails.date || !attachmentDetails.progressive || !attachmentDetails.amount) {
@@ -304,7 +194,7 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
       // 2. Parse year
       const parsedYear = new Date(attachmentDetails.date).getFullYear() || new Date().getFullYear();
 
-      // 3. Create a new Quotation object
+      // 3. Create a new Quotation object (Automatic creation when associating attachment)
       const newQuotation = {
         clientId: selectedClient.id,
         number: attachmentDetails.progressive,
@@ -326,7 +216,7 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
           }
         ],
         notes: `Generato automaticamente dal caricamento dell'allegato PDF in Anagrafiche.`,
-        internalNotes: `Allegato PDF associato: ${localAttachmentName || 'documento.pdf'}\nPercorso: ${localAttachmentPath}`,
+        internalNotes: `Allegato PDF associato (NAS): ${localAttachmentName || 'documento.pdf'}\nPercorso: ${localAttachmentPath}`,
         internalRows: [],
         condizioni: companyInfo.conditionsText || '',
         presentationText: companyInfo.presentationText || '',
@@ -341,7 +231,7 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
       // 4. Save the Quotation
       await saveQuotation(newQuotation);
 
-      // 5. Update the Client with the new attachment in the list
+      // 5. Update the Client with the new attachment
       const updatedAttachments = [
         ...(selectedClient.attachments || []),
         newAttachment
@@ -356,25 +246,10 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
         attachmentAmount: amountNum
       };
 
-      await updateClient(selectedClient.id, updatedClient);
+      await updateClient(updatedClient.id, updatedClient);
       setSelectedClient(updatedClient);
 
-      // Reset new attachment inputs
-      setLocalAttachmentPath(null);
-      setLocalAttachmentName(null);
-      setAttachmentDetails({
-        date: new Date().toISOString().split('T')[0],
-        progressive: '',
-        amount: ''
-      });
-
-      // Clear the file input if we can find it
-      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
-
-      alert('Allegato salvato con successo e nuovo preventivo generato!');
-      
-      // Sync DB
+      alert('Associazione salvata con successo e nuovo preventivo generato!');
       window.dispatchEvent(new CustomEvent('database-synced'));
     } catch (err) {
       console.error("Errore salvataggio allegato e creazione preventivo:", err);
@@ -623,10 +498,71 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
 
                   <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
                     {/* Caricamento (Left Panel) */}
-                    <div className="xl:col-span-12 bg-gray-50 p-6 rounded-lg border border-gray-200 space-y-4">
-                      <h4 className="font-bold text-sm text-gray-800 uppercase tracking-wider">Dettagli Ultimo Allegato Associato</h4>
+                    <div className="xl:col-span-5 bg-gray-50 p-6 rounded-lg border border-gray-200 space-y-6">
+                      <div className="flex justify-between items-center border-b border-gray-200 pb-4">
+                        <h4 className="font-bold text-sm text-gray-800 uppercase tracking-wider">Associa Preventivo PDF</h4>
+                        <div className="flex items-center gap-2">
+                           <button
+                            type="button"
+                            onClick={handleConnectNas}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isNasConnected ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-100 text-orange-700 border border-orange-200 hover:bg-orange-200'}`}
+                            title={isNasConnected ? "NAS Connesso" : "Connetti Cartella NAS"}
+                          >
+                            <Settings size={14} />
+                            <span>{isNasConnected ? "NAS ON" : "CONNETTI NAS"}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = 'application/pdf';
+                              input.onchange = (e) => {
+                                const file = (e.target as HTMLInputElement).files?.[0];
+                                if (file) {
+                                  const root = localStorage.getItem('nas_root_path') || '\\\\NAS\\Preventivi\\';
+                                  const fullPath = `${root}${file.name}`;
+                                  setLocalAttachmentPath(fullPath);
+                                  setLocalAttachmentName(file.name);
+                                }
+                              };
+                              input.click();
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-4 rounded-lg text-xs transition-all cursor-pointer flex items-center gap-2 shadow-sm"
+                          >
+                            <FileUp size={16} />
+                            <span>Sfoglia NAS...</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100 space-y-3">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex-1 space-y-1 w-full">
+                            <label className="text-[10px] font-bold text-blue-700 uppercase">Radice Percorso NAS</label>
+                            <input 
+                              type="text" 
+                              placeholder="Es: \\NAS\Preventivi\"
+                              className="w-full bg-white border border-blue-200 rounded px-2.5 py-1.5 text-xs font-mono focus:ring-1 focus:ring-blue-500 outline-none"
+                              defaultValue={localStorage.getItem('nas_root_path') || '\\\\NAS\\Preventivi\\'}
+                              onChange={(e) => {
+                                localStorage.setItem('nas_root_path', e.target.value);
+                                if (localAttachmentName) {
+                                  setLocalAttachmentPath(`${e.target.value}${localAttachmentName}`);
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                        {localAttachmentPath && (
+                          <div className="p-2 bg-white border border-blue-200 rounded flex items-center gap-2 text-xs font-mono text-gray-700 truncate">
+                            <span className="font-bold text-blue-600 shrink-0">Percorso:</span>
+                            <span className="truncate">{localAttachmentPath}</span>
+                          </div>
+                        )}
+                      </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                         <div className="space-y-1">
                           <label className="block text-sm font-medium text-gray-700">Data Preventivo <span className="text-red-500">*</span></label>
                           <input 
@@ -661,12 +597,105 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
                         </div>
                       </div>
 
-                      <div className="pt-4 border-t border-gray-200">
-                        <p className="text-xs text-gray-500 italic">
-                          Nota: Il caricamento diretto di file PDF è stato disabilitato. Utilizza i collegamenti per gestire i documenti.
+                      <div className="pt-4 flex gap-4">
+                        <button
+                          type="button"
+                          onClick={handleSaveAttachment}
+                          disabled={!localAttachmentPath || !attachmentDetails.date || !attachmentDetails.progressive}
+                          className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-2.5 rounded-lg transition-all text-sm shadow-md cursor-pointer flex items-center justify-center gap-2"
+                        >
+                          <Check size={18} />
+                          Salva Associazione
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Elenco Allegati (Right Panel) */}
+                    <div className="xl:col-span-7 space-y-4">
+                      <h4 className="font-bold text-sm text-gray-800 uppercase tracking-wider flex items-center gap-2">
+                        <FileText size={16} />
+                        Allegati Associati
+                      </h4>
+                      
+                      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-xs">
+                        <table className="w-full text-sm text-left">
+                          <thead className="bg-gray-50 text-gray-600 uppercase text-[10px] font-bold border-b border-gray-200">
+                            <tr>
+                              <th className="px-4 py-3">Documento / Data</th>
+                              <th className="px-4 py-3">Prog. / Importo</th>
+                              <th className="px-4 py-3 text-right">Azioni</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {clientAttachments.length === 0 ? (
+                              <tr>
+                                <td colSpan={3} className="px-4 py-8 text-center text-gray-500 italic">
+                                  Nessun allegato trovato per questo cliente.
+                                </td>
+                              </tr>
+                            ) : (
+                              clientAttachments.map((att) => (
+                                <tr key={att.id} className="hover:bg-gray-50/50 transition-colors">
+                                  <td className="px-4 py-3">
+                                    <div className="font-bold text-blue-900 truncate max-w-[200px]" title={att.filename}>
+                                      {att.filename}
+                                    </div>
+                                    <div className="text-[10px] text-gray-500 flex items-center gap-1">
+                                      <FileText size={10} />
+                                      {att.date ? new Date(att.date).toLocaleDateString('it-IT') : 'Data non presente'}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <div className="font-medium text-gray-800">
+                                      {att.progressive}
+                                    </div>
+                                    <div className="text-xs text-green-700 font-bold">
+                                      € {att.amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <div className="flex justify-end gap-2">
+                                      <button
+                                        onClick={() => handleViewPdf(att.path)}
+                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-all cursor-pointer"
+                                        title="Visualizza PDF (NAS)"
+                                      >
+                                        <Eye size={18} />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteAttachment(att.id)}
+                                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-all cursor-pointer"
+                                        title="Elimina associazione"
+                                      >
+                                        <Trash2 size={18} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="p-4 bg-orange-50 border border-orange-100 rounded-lg">
+                        <h5 className="text-xs font-bold text-orange-800 flex items-center gap-1.5 mb-1">
+                          <Settings size={14} />
+                          Istruzioni Visualizzazione NAS
+                        </h5>
+                        <p className="text-[10px] text-orange-700 leading-relaxed">
+                          Per visualizzare i file direttamente dal NAS senza scaricarli manualmente:
+                          <br />
+                          1. Clicca su <strong>CONNETTI NAS</strong> e seleziona la cartella principale sul tuo PC/NAS.
+                          <br />
+                          2. Una volta connesso, potrai usare il tasto <Eye size={10} className="inline" /> per aprire il PDF direttamente nel visualizzatore.
                         </p>
                       </div>
                     </div>
+                  </div>
+                  <div className="pt-2 text-[10px] text-gray-500 italic flex items-center gap-1.5">
+                    <Paperclip size={12} />
+                    Nota: I PDF restano sul tuo NAS. Viene salvato solo il percorso per una rapida consultazione.
                   </div>
                 </div>
               );

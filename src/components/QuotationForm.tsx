@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { CompanyInfo, Client, Quotation, QuotationRow, InternalRow } from '../types';
-import { Plus, Save, FileText, Eye, EyeOff, Download, FolderOpen, HelpCircle, X, User, Zap, Brain, MessageSquare, Notebook, Trash2, Bold, List, Paperclip, Loader2, FileUp, HardDrive, Copy, Check, ExternalLink } from 'lucide-react';
+import { Plus, Save, FileText, Eye, EyeOff, Download, FolderOpen, HelpCircle, X, User, Zap, Brain, MessageSquare, Notebook, Trash2, Bold, List, Paperclip, Loader2, FileUp, HardDrive, Copy, Check, ExternalLink, Settings } from 'lucide-react';
 import { getCompanyProfile, saveQuotation, getQuotations, updateQuotation, getClients, addClient, getAttachments, uploadAttachment, downloadAttachment, deleteAttachment } from '../lib/db';
+import { connectNasFolder, getFileFromNas, getNasFolderHandle } from '../lib/nasBridge';
 import QuillEditor from './QuillEditor';
 import ClientSelectorPopup from './ClientSelectorPopup';
 import PDFPreviewModal from './PDFPreviewModal';
@@ -75,6 +76,35 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
   const [isUploading, setIsUploading] = useState(false);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [activeViewerPath, setActiveViewerPath] = useState<string | null>(null);
+  const [isNasConnected, setIsNasConnected] = useState(false);
+
+  useEffect(() => {
+    getNasFolderHandle().then(handle => {
+      setIsNasConnected(!!handle);
+    });
+  }, []);
+
+  const handleConnectNas = async () => {
+    const success = await connectNasFolder();
+    if (success) {
+      setIsNasConnected(true);
+      alert("Cartella NAS connessa con successo!");
+    }
+  };
+
+  const handleViewNasPdf = async (path: string) => {
+    try {
+      const file = await getFileFromNas(path);
+      if (file) {
+        const url = URL.createObjectURL(file);
+        setActiveViewerPath(url);
+      } else {
+        alert("Impossibile trovare il file sul NAS. Verifica che la cartella sia connessa.");
+      }
+    } catch (err) {
+      console.error("Errore visualizzazione PDF:", err);
+    }
+  };
 
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [stagedLocalPath, setStagedLocalPath] = useState<string>('');
@@ -96,16 +126,6 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
     // Format local network path suggestion (using double backslash for SMB/NAS)
     const suggestedPath = `\\\\NAS\\preventivi\\${filename}`;
     setStagedLocalPath(suggestedPath);
-
-    // Copy to clipboard automatically
-    navigator.clipboard.writeText(suggestedPath)
-      .then(() => {
-        setPathCopiedFeedback(true);
-        setTimeout(() => setPathCopiedFeedback(false), 5000);
-      })
-      .catch((err) => {
-        console.error("Impossibile copiare negli appunti automaticamente:", err);
-      });
   };
 
   const handleConfirmLocalPath = () => {
@@ -1529,109 +1549,126 @@ Ecco il testo del PDF da analizzare:
 
                   <div className="bg-white p-5 rounded-lg border border-gray-300">
                     <div className="space-y-4">
-                      <div className="flex justify-between items-center pb-2 border-b border-gray-200">
-                        <h4 className="font-bold text-xs text-blue-800 uppercase tracking-wider flex items-center gap-2">
-                          <Paperclip size={14} />
-                          Lista Allegati Associati ({attachmentsList.length})
-                        </h4>
-                        {attachmentsList.length > 0 && (
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-2 border-b border-gray-200">
+                        <div className="flex flex-col gap-1">
+                          <h4 className="font-bold text-xs text-blue-800 uppercase tracking-wider flex items-center gap-2">
+                            <Paperclip size={14} />
+                            Gestione Allegati NAS ({attachmentsList.length})
+                          </h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <button
+                              type="button"
+                              onClick={handleConnectNas}
+                              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${isNasConnected ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-100 text-orange-700 border border-orange-200 hover:bg-orange-200'}`}
+                            >
+                              <Settings size={12} />
+                              <span>{isNasConnected ? "NAS ON" : "CONNETTI NAS"}</span>
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-2 w-full md:w-auto">
                           <button
                             type="button"
                             onClick={() => {
-                              if (confirm("Sei sicuro di voler rimuovere TUTTI gli allegati?")) {
-                                setAttachmentsList([]);
-                              }
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.multiple = true;
+                              input.accept = 'application/pdf';
+                              input.onchange = (e) => {
+                                const files = (e.target as HTMLInputElement).files;
+                                if (files) {
+                                  const newPaths: string[] = [];
+                                  const root = localStorage.getItem('nas_root_path') || '\\\\NAS\\Preventivi\\';
+                                  for (let i = 0; i < files.length; i++) {
+                                    const fileName = files[i].name;
+                                    const fullPath = `${root}${fileName}`;
+                                    if (!attachmentsList.includes(fullPath)) {
+                                      newPaths.push(fullPath);
+                                    }
+                                  }
+                                  if (newPaths.length > 0) {
+                                    setAttachmentsList(prev => [...prev, ...newPaths]);
+                                  }
+                                }
+                              };
+                              input.click();
                             }}
-                            className="text-[10px] font-bold text-red-600 hover:text-red-800 transition-colors cursor-pointer"
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded-lg text-[10px] transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
                           >
-                            Svuota tutto
+                            <FileUp size={14} />
+                            <span>Aggiungi File dal NAS...</span>
                           </button>
-                        )}
+                          
+                          {attachmentsList.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm("Sei sicuro di voler rimuovere TUTTI gli allegati?")) {
+                                  setAttachmentsList([]);
+                                }
+                              }}
+                              className="text-[10px] font-bold text-red-600 hover:text-red-800 transition-colors cursor-pointer border border-red-200 px-2 py-1.5 rounded-lg"
+                            >
+                              Svuota tutto
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100 flex flex-col md:flex-row gap-3 items-center">
+                        <div className="flex-1 space-y-1 w-full">
+                          <label className="text-[10px] font-bold text-blue-700 uppercase">Radice Percorso NAS predefinita</label>
+                          <input 
+                            type="text" 
+                            placeholder="Es: \\NAS\Preventivi\"
+                            className="w-full bg-white border border-blue-200 rounded px-2 py-1 text-xs font-mono"
+                            defaultValue={localStorage.getItem('nas_root_path') || '\\\\NAS\\Preventivi\\'}
+                            onChange={(e) => localStorage.setItem('nas_root_path', e.target.value)}
+                          />
+                        </div>
+                        <p className="text-[9px] text-blue-600 max-w-[200px] leading-tight italic">
+                          Nota: I file non vengono caricati sul server. Salviamo solo il link per permetterti di ritrovarli sul NAS.
+                        </p>
                       </div>
 
                         {attachmentsList.length > 0 ? (
-                          <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
-                            {attachmentsList.map((path, idx) => {
-                              const isNas = isNasLinkPath(path);
-                              const filename = getFileNameFromPath(path);
+                          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                            {attachmentsList.map((pathStr, idx) => {
+                              const isNas = isNasLinkPath(pathStr);
+                              const filename = getFileNameFromPath(pathStr);
                               return (
-                                <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-all flex flex-col gap-2">
-                                  <div className="flex items-start gap-3">
-                                    {isNas ? (
-                                      <div className="p-1.5 bg-purple-50 text-purple-600 rounded">
-                                        <HardDrive size={18} />
-                                      </div>
-                                    ) : (
-                                      <div className="p-1.5 bg-red-50 text-red-600 rounded">
-                                        <FileText size={18} />
-                                      </div>
-                                    )}
-                                    <div className="overflow-hidden flex-1">
-                                      <span className="block font-bold text-xs text-gray-900 truncate" title={filename}>
-                                        {filename}
-                                      </span>
-                                      <span className="block text-[10px] text-gray-500 truncate font-mono select-all" title={path}>
-                                        {isNas ? 'Percorso NAS' : 'Link/Percorso'}: {path}
-                                      </span>
-                                    </div>
-                                    <span className="text-[10px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
-                                      #{idx + 1}
-                                    </span>
+                                <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg group hover:border-blue-300 transition-all">
+                                  <div className={`p-2 bg-white rounded border border-gray-200 ${isNas ? 'text-purple-600' : 'text-red-600'}`}>
+                                    {isNas ? <HardDrive size={18} /> : <FileText size={18} />}
                                   </div>
-
-                                  <div className="flex gap-1.5 flex-wrap pt-2 border-t border-gray-150 items-center font-sans">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-bold text-gray-900 truncate">
+                                      {filename}
+                                    </p>
+                                    <p className="text-[10px] text-gray-500 truncate font-mono">
+                                      {pathStr}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
                                     <button
                                       type="button"
-                                      onClick={() => setActiveViewerPath(path)}
-                                      className="flex items-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold px-2 py-1 rounded text-[10px] border border-blue-200 transition-colors cursor-pointer"
-                                      title="Visualizza l'allegato nel pannello integrato"
+                                      onClick={() => handleViewNasPdf(pathStr)}
+                                      className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md transition-colors cursor-pointer flex items-center gap-1"
+                                      title="Visualizza PDF"
                                     >
-                                      <Eye size={11} />
-                                      <span>Anteprima</span>
+                                      <Eye size={14} />
+                                      <span className="text-[9px] font-bold uppercase">Visualizza</span>
                                     </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (path.toLowerCase().endsWith('.pdf')) {
-                                          window.open(`/api/stream-pdf?path=${encodeURIComponent(path)}`, '_blank');
-                                        } else if (isNas) {
-                                          navigator.clipboard.writeText(path);
-                                          alert(`Il percorso locale/NAS:\n\n${path}\n\nè stato copiato negli appunti.\n\nIncollalo in Esplora Risorse (Windows) o Finder (Mac) per aprirlo direttamente.`);
-                                        } else {
-                                          window.open(path, '_blank');
-                                        }
-                                      }}
-                                      className="flex items-center gap-1 bg-teal-50 text-teal-750 hover:bg-teal-100 font-semibold px-2 py-1 rounded text-[10px] border border-teal-200 transition-colors cursor-pointer"
-                                      title="Apri file in una nuova scheda o copia percorso NAS"
-                                    >
-                                      <ExternalLink size={11} />
-                                      <span>Visualizza</span>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        navigator.clipboard.writeText(path);
-                                        alert("Percorso completo copiato negli appunti!");
-                                      }}
-                                      className="flex items-center gap-1 bg-purple-50 text-purple-700 hover:bg-purple-100 font-semibold px-2 py-1 rounded text-[10px] border border-purple-200 transition-colors cursor-pointer"
-                                      title="Copia negli appunti"
-                                    >
-                                      <Copy size={11} />
-                                      <span>Copia</span>
-                                    </button>
-
                                     <button
                                       type="button"
                                       onClick={() => {
                                         setAttachmentsList(prev => prev.filter((_, i) => i !== idx));
                                       }}
-                                      className="flex items-center gap-1 bg-red-50 text-red-600 hover:bg-red-100 font-semibold px-2 py-1 rounded text-[10px] border border-red-200 transition-colors cursor-pointer ml-auto"
-                                      title="Elimina questo allegato"
+                                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                                      title="Rimuovi associazione"
                                     >
-                                      <Trash2 size={11} />
-                                      <span>Rimuovi</span>
+                                      <Trash2 size={14} />
                                     </button>
                                   </div>
                                 </div>
@@ -1639,9 +1676,10 @@ Ecco il testo del PDF da analizzare:
                             })}
                           </div>
                         ) : (
-                          <div className="text-center py-12 text-gray-500 border border-dashed border-gray-300 rounded-lg bg-gray-50">
-                            <p className="text-xs font-medium">Nessun file PDF o percorso NAS collegato a questo preventivo.</p>
-                            <p className="text-[10px] text-gray-400 mt-1">Usa i metodi a sinistra per aggiungerne.</p>
+                          <div className="text-center py-10 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                            <Paperclip size={32} className="mx-auto text-gray-300 mb-3" />
+                            <p className="text-xs font-medium text-gray-500">Nessun allegato associato a questo preventivo.</p>
+                            <p className="text-[10px] text-gray-400 mt-1">Usa il pulsante in alto per aggiungere file dal tuo NAS.</p>
                           </div>
                         )}
                       </div>
@@ -1865,17 +1903,9 @@ function PDFViewerModal({ isOpen, onClose, pdfPath }: PDFViewerModalProps) {
                   <span className="block mb-1 text-[10px] uppercase text-gray-400 font-sans tracking-wider font-semibold">Percorso File:</span>
                   {pdfPath}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(pdfPath);
-                    alert("Percorso copiato negli appunti! Ora puoi incollarlo in Esplora File o Finder.");
-                  }}
-                  className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-all shadow-sm cursor-pointer"
-                >
-                  <Copy size={16} />
-                  <span>Copia Percorso negli Appunti</span>
-                </button>
+                <p className="text-xs text-orange-600 font-bold">
+                  Per visualizzare questo file, usa il tasto "Visualizza" nella lista allegati (richiede NAS connesso).
+                </p>
               </div>
             </div>
           ) : (
