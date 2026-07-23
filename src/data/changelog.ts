@@ -11,6 +11,22 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.5.3",
+    date: "2026-07-23",
+    title: "Gestionale v3.5.3 - Logica Salvataggio Colori Avanzata",
+    type: "patch",
+    changes: [
+      {
+        category: "improvement",
+        text: "Logica Colori: Implementato il salvataggio individuale dei parametri (Modalità, DPI, PPI) per ogni colore associato. Cliccando su un colore esistente, i parametri correnti della scheda vengono ora sovrascritti nella riga specifica."
+      },
+      {
+        category: "improvement",
+        text: "UX Tabella: Ripristinata la visualizzazione dei parametri salvati per singola riga nella tabella colori laser, garantendo che ogni colore mantenga le proprie impostazioni tecniche."
+      }
+    ]
+  },
+  {
     version: "3.5.2",
     date: "2026-07-23",
     title: "Gestionale v3.5.2 - Raffinamento Interfaccia Laser",

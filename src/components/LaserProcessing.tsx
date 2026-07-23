@@ -1460,28 +1460,28 @@ export default function LaserProcessing({ currentUser }: Props) {
                                     ...editingRow,
                                     colorRows: [...currentColorRows, newRow]
                                   });
-                                } else if (rowsForColor.length === 1) {
-                                  // Create new row with opposite type
-                                  const existingRow = rowsForColor[0];
-                                  const newRow: LaserColorRow = {
-                                    id: Date.now().toString(36) + Math.random().toString(36).substring(2, 5),
-                                    raster: !existingRow.raster,
-                                    vector: !existingRow.vector,
-                                    colorRgb: c.color,
-                                    velocita: editingRow.velocita || '',
-                                    potenza: editingRow.potenza || '',
-                                    passaggi: editingRow.passaggi || '',
-                                    frequenza: editingRow.frequenza || '',
-                                    modalita: editingRow.modalita || '',
-                                    dpi: editingRow.dpi || '',
-                                    ppi: editingRow.ppi || ''
-                                  };
+                                } else {
+                                  // Update ALL existing rows of this color with current main parameters
+                                  const updatedRows = currentColorRows.map(row => {
+                                    if (row.colorRgb === c.color) {
+                                      return {
+                                        ...row,
+                                        velocita: editingRow.velocita || row.velocita,
+                                        potenza: editingRow.potenza || row.potenza,
+                                        passaggi: editingRow.passaggi || row.passaggi,
+                                        frequenza: editingRow.frequenza || row.frequenza,
+                                        modalita: editingRow.modalita || row.modalita,
+                                        dpi: editingRow.dpi || row.dpi,
+                                        ppi: editingRow.ppi || row.ppi
+                                      };
+                                    }
+                                    return row;
+                                  });
                                   setEditingRow({
                                     ...editingRow,
-                                    colorRows: [...currentColorRows, newRow]
+                                    colorRows: updatedRows
                                   });
                                 }
-                                // If 2 or more rows already exist for this color, do nothing
                               }}
                               className="w-8 h-8 rounded-full border border-gray-300 shadow-xs hover:scale-110 transition-transform cursor-pointer"
                               style={{ backgroundColor: c.color }}
@@ -1727,17 +1727,17 @@ export default function LaserProcessing({ currentUser }: Props) {
                                     <>
                                       <td className="px-2 py-2">
                                         <div className="w-full bg-gray-50 border border-gray-200 rounded px-1.5 py-1 text-[11px] text-gray-600 font-medium text-center">
-                                          {editingRow?.modalita || '-'}
+                                          {colRow.modalita || '-'}
                                         </div>
                                       </td>
                                       <td className="px-2 py-2 text-center">
                                         <div className="w-full bg-gray-50 border border-gray-200 rounded px-1.5 py-1 text-[11px] text-gray-600 font-medium text-center">
-                                          {editingRow?.dpi || '-'}
+                                          {colRow.dpi || '-'}
                                         </div>
                                       </td>
                                       <td className="px-2 py-2 text-center">
                                         <div className="w-full bg-gray-50 border border-gray-200 rounded px-1.5 py-1 text-[11px] text-gray-600 font-medium text-center">
-                                          {editingRow?.ppi || '-'}
+                                          {colRow.ppi || '-'}
                                         </div>
                                       </td>
                                     </>
