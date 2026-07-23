@@ -22,7 +22,11 @@ export const changelogData: ChangelogEntry[] = [
       },
       {
         category: "improvement",
-        text: "Dimensionamento Scheda: Ampliata la larghezza della scheda lavorazione del 10% (max-w-7xl) per accogliere meglio la tabella parametri estesa."
+        text: "Sincronizzazione Parametri: Rimossi i selettori ridondanti nella tabella colori; i parametri Modalità, DPI e PPI vengono ora ereditati direttamente dalle impostazioni principali del materiale."
+      },
+      {
+        category: "improvement",
+        text: "Dimensionamento Scheda: Ampliata ulteriormente la larghezza della scheda lavorazione (max-w-[84rem]) per una visualizzazione ottimale dei dati tecnici."
       }
     ]
   },

@@ -582,7 +582,7 @@ export default function LaserProcessing({ currentUser }: Props) {
       </div>
 
       {/* Main Card Container */}
-      <div className="bg-gray-200 p-10 rounded-xl border border-gray-300 shadow-sm text-gray-900 max-w-7xl mx-auto w-full">
+      <div className="bg-gray-200 p-10 rounded-xl border border-gray-300 shadow-sm text-gray-900 max-w-[84rem] mx-auto w-full">
         
         {/* Gestione Preset Materiali */}
         {laserData.savedMaterials && laserData.savedMaterials.length > 0 && (
@@ -1090,7 +1090,7 @@ export default function LaserProcessing({ currentUser }: Props) {
 
         return (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-            <div className="bg-white rounded-xl shadow-xl border border-gray-300 max-w-7xl w-full overflow-hidden text-gray-900 flex flex-col max-h-[90vh]">
+            <div className="bg-white rounded-xl shadow-xl border border-gray-300 max-w-[84rem] w-full overflow-hidden text-gray-900 flex flex-col max-h-[90vh]">
               {/* Header */}
               <div className="bg-gradient-to-r from-blue-800 to-indigo-950 text-white px-6 py-4 flex items-center justify-between shrink-0">
                 <h3 className="text-lg font-bold flex items-center gap-2">
@@ -1726,36 +1726,19 @@ export default function LaserProcessing({ currentUser }: Props) {
                                   {isX252 && (
                                     <>
                                       <td className="px-2 py-2">
-                                        <select
-                                          value={colRow.modalita || ''}
-                                          onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'modalita', e.target.value)}
-                                          className="w-full bg-white border border-gray-300 rounded px-1.5 py-1 text-[11px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        >
-                                          <option value="">Scegli</option>
-                                          <option value="BLACK&WHITE">B&W</option>
-                                          <option value="MANUAL COLOR">MANUAL</option>
-                                          <option value="3D MODE">3D</option>
-                                          <option value="STAMP MODE">STAMP</option>
-                                        </select>
+                                        <div className="w-full bg-gray-50 border border-gray-200 rounded px-1.5 py-1 text-[11px] text-gray-600 font-medium text-center">
+                                          {editingRow?.modalita || '-'}
+                                        </div>
                                       </td>
-                                      <td className="px-2 py-2">
-                                        <select
-                                          value={colRow.dpi || ''}
-                                          onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'dpi', e.target.value)}
-                                          className="w-full bg-white border border-gray-300 rounded px-1.5 py-1 text-[11px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        >
-                                          <option value="">DPI</option>
-                                          {[125, 250, 300, 380, 500, 600, 760, 1000].map(d => <option key={d} value={d}>{d}</option>)}
-                                        </select>
+                                      <td className="px-2 py-2 text-center">
+                                        <div className="w-full bg-gray-50 border border-gray-200 rounded px-1.5 py-1 text-[11px] text-gray-600 font-medium text-center">
+                                          {editingRow?.dpi || '-'}
+                                        </div>
                                       </td>
-                                      <td className="px-2 py-2">
-                                        <input
-                                          type="number"
-                                          value={colRow.ppi || ''}
-                                          onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'ppi', e.target.value)}
-                                          className="w-full bg-white border border-gray-300 rounded px-1.5 py-1 text-[11px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                                          placeholder="PPI"
-                                        />
+                                      <td className="px-2 py-2 text-center">
+                                        <div className="w-full bg-gray-50 border border-gray-200 rounded px-1.5 py-1 text-[11px] text-gray-600 font-medium text-center">
+                                          {editingRow?.ppi || '-'}
+                                        </div>
                                       </td>
                                     </>
                                   )}
