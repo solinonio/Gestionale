@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getLaserProcessingData, saveLaserProcessingData, getClients, getSharedMaterials, addSharedMaterial } from '../lib/db';
-import { LaserProcessingData, LaserConfigRow, Client, User, SharedMaterial } from '../types';
+import { LaserProcessingData, LaserConfigRow, LaserColorRow, Client, User, SharedMaterial } from '../types';
 import { Plus, Trash2, Copy, Save, Check, Cpu, Zap, Settings, RefreshCw, Search, Star, User as UserIcon, Wind, Fan, Edit, CircleDashed, Activity } from 'lucide-react';
 
 const LightburnIcon = ({ size = 20, className = "" }: { size?: number; className?: string }) => (
@@ -469,7 +469,7 @@ export default function LaserProcessing({ currentUser }: Props) {
     });
   };
 
-  const handleUpdateColorRowInEditing = (id: string, field: 'raster' | 'vector' | 'colorRgb' | 'velocita' | 'potenza' | 'frequenza' | 'passaggi', value: any) => {
+  const handleUpdateColorRowInEditing = (id: string, field: 'raster' | 'vector' | 'colorRgb' | 'velocita' | 'potenza' | 'frequenza' | 'passaggi' | 'modalita' | 'dpi' | 'ppi', value: any) => {
     if (!editingRow) return;
     const updated = (editingRow.colorRows || []).map(row => {
       if (row.id === id) {
@@ -1085,6 +1085,7 @@ export default function LaserProcessing({ currentUser }: Props) {
           (laserData[tab] || []).some(r => r.id === editingRow.id)
         ) || (activeSubTab === 'Tutti' ? 'X252' : activeSubTab as 'X252' | 'Fibra' | 'Prometheo');
         const isFibra = originTab === 'Fibra' || editingRow.softwareEzc;
+        const isX252 = originTab === 'X252' || editingRow.softwareScaLaser;
         const colorRows = editingRow.colorRows || [];
 
         return (
@@ -1442,7 +1443,7 @@ export default function LaserProcessing({ currentUser }: Props) {
 
                                 if (rowsForColor.length === 0) {
                                   // Create new row, default to vector
-                                  const newRow = {
+                                  const newRow: LaserColorRow = {
                                     id: Date.now().toString(36) + Math.random().toString(36).substring(2, 5),
                                     raster: false,
                                     vector: true,
@@ -1450,7 +1451,10 @@ export default function LaserProcessing({ currentUser }: Props) {
                                     velocita: editingRow.velocita || '',
                                     potenza: editingRow.potenza || '',
                                     passaggi: editingRow.passaggi || '',
-                                    frequenza: editingRow.frequenza || ''
+                                    frequenza: editingRow.frequenza || '',
+                                    modalita: editingRow.modalita || '',
+                                    dpi: editingRow.dpi || '',
+                                    ppi: editingRow.ppi || ''
                                   };
                                   setEditingRow({
                                     ...editingRow,
@@ -1459,7 +1463,7 @@ export default function LaserProcessing({ currentUser }: Props) {
                                 } else if (rowsForColor.length === 1) {
                                   // Create new row with opposite type
                                   const existingRow = rowsForColor[0];
-                                  const newRow = {
+                                  const newRow: LaserColorRow = {
                                     id: Date.now().toString(36) + Math.random().toString(36).substring(2, 5),
                                     raster: !existingRow.raster,
                                     vector: !existingRow.vector,
@@ -1467,7 +1471,10 @@ export default function LaserProcessing({ currentUser }: Props) {
                                     velocita: editingRow.velocita || '',
                                     potenza: editingRow.potenza || '',
                                     passaggi: editingRow.passaggi || '',
-                                    frequenza: editingRow.frequenza || ''
+                                    frequenza: editingRow.frequenza || '',
+                                    modalita: editingRow.modalita || '',
+                                    dpi: editingRow.dpi || '',
+                                    ppi: editingRow.ppi || ''
                                   };
                                   setEditingRow({
                                     ...editingRow,
@@ -1633,6 +1640,13 @@ export default function LaserProcessing({ currentUser }: Props) {
                                 <th className="px-2 py-2 w-[60px]">VEL</th>
                                 <th className="px-2 py-2 w-[60px]">POT</th>
                                 {isFibra && <th className="px-2 py-2 w-[60px]">FREQ</th>}
+                                {isX252 && (
+                                  <>
+                                    <th className="px-2 py-2 w-[100px]">MODALITÀ</th>
+                                    <th className="px-2 py-2 w-[80px]">DPI</th>
+                                    <th className="px-2 py-2 w-[70px]">PPI</th>
+                                  </>
+                                )}
                                 <th className="px-2 py-2 text-center w-[50px]">ELIMINA</th>
                               </tr>
                             </thead>
@@ -1705,6 +1719,44 @@ export default function LaserProcessing({ currentUser }: Props) {
                                         placeholder="Freq"
                                       />
                                     </td>
+                                  )}
+
+                                  {/* MODALITÀ (X252) */}
+                                  {isX252 && (
+                                    <>
+                                      <td className="px-2 py-2">
+                                        <select
+                                          value={colRow.modalita || ''}
+                                          onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'modalita', e.target.value)}
+                                          className="w-full bg-white border border-gray-300 rounded px-1 py-0.5 text-[10px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        >
+                                          <option value="">Scegli</option>
+                                          <option value="BLACK&WHITE">B&W</option>
+                                          <option value="MANUAL COLOR">MANUAL</option>
+                                          <option value="3D MODE">3D</option>
+                                          <option value="STAMP MODE">STAMP</option>
+                                        </select>
+                                      </td>
+                                      <td className="px-2 py-2">
+                                        <select
+                                          value={colRow.dpi || ''}
+                                          onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'dpi', e.target.value)}
+                                          className="w-full bg-white border border-gray-300 rounded px-1 py-0.5 text-[10px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        >
+                                          <option value="">DPI</option>
+                                          {[125, 250, 300, 380, 500, 600, 760, 1000].map(d => <option key={d} value={d}>{d}</option>)}
+                                        </select>
+                                      </td>
+                                      <td className="px-2 py-2">
+                                        <input
+                                          type="number"
+                                          value={colRow.ppi || ''}
+                                          onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'ppi', e.target.value)}
+                                          className="w-full bg-white border border-gray-300 rounded px-1 py-0.5 text-[10px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                                          placeholder="PPI"
+                                        />
+                                      </td>
+                                    </>
                                   )}
 
                                   {/* DELETE ROW */}

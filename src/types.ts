@@ -188,6 +188,9 @@ export interface LaserColorRow {
   potenza?: string;
   frequenza?: string;
   passaggi?: string;
+  modalita?: string;
+  dpi?: string;
+  ppi?: string;
 }
 
 export interface LaserProcessingData {

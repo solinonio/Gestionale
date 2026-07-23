@@ -11,6 +11,26 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.4.0",
+    date: "2026-07-23",
+    title: "Gestionale v3.4.0 - Parametri Laser Avanzati e Automazione NAS",
+    type: "minor",
+    changes: [
+      {
+        category: "feature",
+        text: "Lavorazioni Laser (X252): Aggiunta la gestione granulare per colore di Modalità, DPI e PPI. I valori vengono ora memorizzati e richiamati correttamente per ogni singola riga colore."
+      },
+      {
+        category: "improvement",
+        text: "Automazione NAS: Ottimizzato il flusso di selezione cartelle NAS. Ora il percorso viene riportato e memorizzato automaticamente come 'Radice Percorso NAS predefinita' senza passaggi manuali aggiuntivi."
+      },
+      {
+        category: "improvement",
+        text: "Gestione Allegati: Corretto il rilevamento del percorso esatto durante l'associazione dei file dal volume di rete."
+      }
+    ]
+  },
+  {
     version: "3.2.2",
     date: "2026-07-17",
     title: "Gestionale v3.2.2 - Nuova Repository GitHub di Default",
