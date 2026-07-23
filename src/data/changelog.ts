@@ -11,6 +11,22 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.5.2",
+    date: "2026-07-23",
+    title: "Gestionale v3.5.2 - Raffinamento Interfaccia Laser",
+    type: "patch",
+    changes: [
+      {
+        category: "improvement",
+        text: "Tabella Colori Laser: Riportati tutti i parametri (Velocità, Potenza, Modalità, DPI, PPI) su una singola riga orizzontale per una consultazione più rapida."
+      },
+      {
+        category: "improvement",
+        text: "Dimensionamento Scheda: Ampliata la larghezza della scheda lavorazione del 10% (max-w-7xl) per accogliere meglio la tabella parametri estesa."
+      }
+    ]
+  },
+  {
     version: "3.5.1",
     date: "2026-07-23",
     title: "Gestionale v3.5.1 - Ottimizzazione Spazi e Leggibilità",
