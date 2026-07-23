@@ -11,6 +11,38 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.5.1",
+    date: "2026-07-23",
+    title: "Gestionale v3.5.1 - Ottimizzazione Spazi e Leggibilità",
+    type: "patch",
+    changes: [
+      {
+        category: "improvement",
+        text: "Layout Laser: Riequilibrata la scheda lavorazione laser, aumentando lo spazio dedicato ai colori associati e riducendo la sezione materiale del 10% per una visualizzazione più ampia."
+      },
+      {
+        category: "improvement",
+        text: "Tipografia Laser: Aumentata la dimensione dei caratteri e delle etichette nella tabella colori per facilitare la lettura e l'inserimento dei parametri tecnici."
+      }
+    ]
+  },
+  {
+    version: "3.5.0",
+    date: "2026-07-23",
+    title: "Gestionale v3.5.0 - UX Laser Ottimizzata",
+    type: "minor",
+    changes: [
+      {
+        category: "improvement",
+        text: "Design Colori Laser: Riprogettata l'impaginazione della tabella colori associati per una migliore leggibilità. I parametri specifici per X252 (Modalità, DPI, PPI) sono stati raggruppati in un layout multi-riga più chiaro."
+      },
+      {
+        category: "improvement",
+        text: "Interfaccia Utente: Ottimizzati gli spazi e le etichette nella scheda lavorazione per facilitare l'inserimento dei dati tecnici."
+      }
+    ]
+  },
+  {
     version: "3.4.0",
     date: "2026-07-23",
     title: "Gestionale v3.4.0 - Parametri Laser Avanzati e Automazione NAS",

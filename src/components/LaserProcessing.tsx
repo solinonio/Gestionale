@@ -1118,8 +1118,8 @@ export default function LaserProcessing({ currentUser }: Props) {
               <div className="p-6 overflow-y-auto flex-1">
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                   
-                  {/* Left Column: Material Info (7 columns) */}
-                  <div className="lg:col-span-7 space-y-4">
+                  {/* Left Column: Material Info (6 columns) */}
+                  <div className="lg:col-span-6 space-y-4">
                     {/* Associazione Materiale Condiviso */}
                     <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-4">
                       <div className="flex items-center justify-between">
@@ -1620,143 +1620,149 @@ export default function LaserProcessing({ currentUser }: Props) {
                     </div>
                   </div>
 
-                  {/* Right Column: Colors Association (5 columns) */}
-                  <div className="lg:col-span-5 h-full">
+                  {/* Right Column: Colors Association (6 columns) */}
+                  <div className="lg:col-span-6 h-full">
                     <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 space-y-4 h-full flex flex-col justify-between">
                       <div>
                         <div className="flex items-center justify-between border-b border-gray-200 pb-2 mb-3">
-                          <h4 className="font-bold text-xs text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <h4 className="font-bold text-sm text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
                             <span>🎨</span> Colori Laser Associati
                           </h4>
                         </div>
 
                         <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-                          <table className="w-full text-xs text-left border-collapse">
-                            <thead className="bg-gray-100 text-gray-600 font-bold border-b border-gray-200 uppercase tracking-wider text-[10px]">
+                          <table className="w-full text-sm text-left border-collapse">
+                            <thead className="bg-gray-100 text-gray-600 font-bold border-b border-gray-200 uppercase tracking-wider text-[11px]">
                               <tr>
-                                <th className="px-2 py-2 text-center w-[60px]">RASTER</th>
-                                <th className="px-2 py-2 text-center w-[60px]">VECTOR</th>
-                                <th className="px-2.5 py-2">COLORE RGB</th>
-                                <th className="px-2 py-2 w-[60px]">VEL</th>
-                                <th className="px-2 py-2 w-[60px]">POT</th>
-                                {isFibra && <th className="px-2 py-2 w-[60px]">FREQ</th>}
-                                {isX252 && (
-                                  <>
-                                    <th className="px-2 py-2 w-[100px]">MODALITÀ</th>
-                                    <th className="px-2 py-2 w-[80px]">DPI</th>
-                                    <th className="px-2 py-2 w-[70px]">PPI</th>
-                                  </>
-                                )}
-                                <th className="px-2 py-2 text-center w-[50px]">ELIMINA</th>
+                                <th className="px-2 py-2 text-center w-[60px]">TIPO</th>
+                                <th className="px-2 py-2">COLORE</th>
+                                <th className="px-2 py-2 w-[80px]">VEL</th>
+                                <th className="px-2 py-2 w-[80px]">POT</th>
+                                {isFibra && <th className="px-2 py-2 w-[80px]">FREQ</th>}
+                                {isX252 && <th className="px-2 py-2 w-[240px]">PARAMETRI X252</th>}
+                                <th className="px-2 py-2 text-center w-[60px]">DEL</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-150">
                               {colorRows.map((colRow) => (
                                 <tr key={colRow.id} className="hover:bg-gray-50/50 transition-colors">
-                                  {/* RASTER */}
-                                  <td className="px-2 py-2 text-center">
-                                    <input
-                                      type="checkbox"
-                                      checked={!!colRow.raster}
-                                      onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'raster', e.target.checked)}
-                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                                    />
-                                  </td>
-
-                                  {/* VECTOR */}
-                                  <td className="px-2 py-2 text-center">
-                                    <input
-                                      type="checkbox"
-                                      checked={!!colRow.vector}
-                                      onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'vector', e.target.checked)}
-                                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
-                                    />
-                                  </td>
-
-                                  {/* COLORE RGB (Dropdown + direct picker) */}
-                                  <td className="px-2.5 py-2">
-                                    <div className="flex items-center gap-1.5">
-                                      <input
-                                        type="color"
-                                        value={colRow.colorRgb}
-                                        onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'colorRgb', e.target.value)}
-                                        className="w-5.5 h-5.5 rounded-md border border-gray-300 cursor-pointer bg-transparent shrink-0"
-                                        title="Seleziona colore"
-                                      />
+                                  {/* RASTER / VECTOR column grouped */}
+                                  <td className="px-2 py-2">
+                                    <div className="flex flex-col gap-1 items-center">
+                                      <label className="flex items-center gap-1 cursor-pointer" title="Raster">
+                                        <input
+                                          type="checkbox"
+                                          checked={!!colRow.raster}
+                                          onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'raster', e.target.checked)}
+                                          className="w-3 h-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                        />
+                                        <span className="text-[11px] font-bold text-blue-600">R</span>
+                                      </label>
+                                      <label className="flex items-center gap-1 cursor-pointer" title="Vector">
+                                        <input
+                                          type="checkbox"
+                                          checked={!!colRow.vector}
+                                          onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'vector', e.target.checked)}
+                                          className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                        />
+                                        <span className="text-[11px] font-bold text-indigo-600">V</span>
+                                      </label>
                                     </div>
+                                  </td>
+
+                                  {/* COLORE RGB */}
+                                  <td className="px-2 py-2">
+                                    <input
+                                      type="color"
+                                      value={colRow.colorRgb}
+                                      onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'colorRgb', e.target.value)}
+                                      className="w-8 h-8 rounded-md border border-gray-300 cursor-pointer bg-transparent"
+                                      title="Seleziona colore"
+                                    />
                                   </td>
 
                                   {/* VELOCITA */}
                                   <td className="px-2 py-2">
-                                    <input
-                                      type="text"
-                                      value={colRow.velocita || ''}
-                                      onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'velocita', e.target.value)}
-                                      className="w-full bg-white border border-gray-300 rounded px-1.5 py-0.5 text-[10px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                                      placeholder="Vel"
-                                    />
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Vel</span>
+                                      <input
+                                        type="text"
+                                        value={colRow.velocita || ''}
+                                        onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'velocita', e.target.value)}
+                                        className="w-full bg-white border border-gray-300 rounded px-1.5 py-1 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                                      />
+                                    </div>
                                   </td>
                                   
                                   {/* POTENZA */}
                                   <td className="px-2 py-2">
-                                    <input
-                                      type="text"
-                                      value={colRow.potenza || ''}
-                                      onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'potenza', e.target.value)}
-                                      className="w-full bg-white border border-gray-300 rounded px-1.5 py-0.5 text-[10px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                                      placeholder="Pot"
-                                    />
+                                    <div className="flex flex-col">
+                                      <span className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Pot</span>
+                                      <input
+                                        type="text"
+                                        value={colRow.potenza || ''}
+                                        onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'potenza', e.target.value)}
+                                        className="w-full bg-white border border-gray-300 rounded px-1.5 py-1 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                                      />
+                                    </div>
                                   </td>
 
                                   {/* FREQUENZA */}
                                   {isFibra && (
                                     <td className="px-2 py-2">
-                                      <input
-                                        type="text"
-                                        value={colRow.frequenza || ''}
-                                        onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'frequenza', e.target.value)}
-                                        className="w-full bg-white border border-gray-300 rounded px-1.5 py-0.5 text-[10px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                                        placeholder="Freq"
-                                      />
+                                      <div className="flex flex-col">
+                                        <span className="text-[10px] text-gray-400 font-bold uppercase mb-0.5">Freq</span>
+                                        <input
+                                          type="text"
+                                          value={colRow.frequenza || ''}
+                                          onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'frequenza', e.target.value)}
+                                          className="w-full bg-white border border-gray-300 rounded px-1.5 py-1 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                                        />
+                                      </div>
                                     </td>
                                   )}
 
-                                  {/* MODALITÀ (X252) */}
+                                  {/* X252 PARAMETERS (MODALITÀ, DPI, PPI) */}
                                   {isX252 && (
-                                    <>
-                                      <td className="px-2 py-2">
-                                        <select
-                                          value={colRow.modalita || ''}
-                                          onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'modalita', e.target.value)}
-                                          className="w-full bg-white border border-gray-300 rounded px-1 py-0.5 text-[10px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        >
-                                          <option value="">Scegli</option>
-                                          <option value="BLACK&WHITE">B&W</option>
-                                          <option value="MANUAL COLOR">MANUAL</option>
-                                          <option value="3D MODE">3D</option>
-                                          <option value="STAMP MODE">STAMP</option>
-                                        </select>
-                                      </td>
-                                      <td className="px-2 py-2">
-                                        <select
-                                          value={colRow.dpi || ''}
-                                          onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'dpi', e.target.value)}
-                                          className="w-full bg-white border border-gray-300 rounded px-1 py-0.5 text-[10px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        >
-                                          <option value="">DPI</option>
-                                          {[125, 250, 300, 380, 500, 600, 760, 1000].map(d => <option key={d} value={d}>{d}</option>)}
-                                        </select>
-                                      </td>
-                                      <td className="px-2 py-2">
-                                        <input
-                                          type="number"
-                                          value={colRow.ppi || ''}
-                                          onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'ppi', e.target.value)}
-                                          className="w-full bg-white border border-gray-300 rounded px-1 py-0.5 text-[10px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                                          placeholder="PPI"
-                                        />
-                                      </td>
-                                    </>
+                                    <td className="px-2 py-2 bg-blue-50/30">
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div className="col-span-2">
+                                          <span className="text-[10px] text-blue-500 font-bold uppercase mb-0.5 block text-center">Modalità</span>
+                                          <select
+                                            value={colRow.modalita || ''}
+                                            onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'modalita', e.target.value)}
+                                            className="w-full bg-white border border-blue-200 rounded px-1.5 py-1 text-[11px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                          >
+                                            <option value="">Scegli</option>
+                                            <option value="BLACK&WHITE">B&W</option>
+                                            <option value="MANUAL COLOR">MANUAL</option>
+                                            <option value="3D MODE">3D</option>
+                                            <option value="STAMP MODE">STAMP</option>
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <span className="text-[10px] text-blue-500 font-bold uppercase mb-0.5 block text-center">DPI</span>
+                                          <select
+                                            value={colRow.dpi || ''}
+                                            onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'dpi', e.target.value)}
+                                            className="w-full bg-white border border-blue-200 rounded px-1.5 py-1 text-[11px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                          >
+                                            <option value="">DPI</option>
+                                            {[125, 250, 300, 380, 500, 600, 760, 1000].map(d => <option key={d} value={d}>{d}</option>)}
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <span className="text-[10px] text-blue-500 font-bold uppercase mb-0.5 block text-center">PPI</span>
+                                          <input
+                                            type="number"
+                                            value={colRow.ppi || ''}
+                                            onChange={(e) => handleUpdateColorRowInEditing(colRow.id, 'ppi', e.target.value)}
+                                            className="w-full bg-white border border-blue-200 rounded px-1.5 py-1 text-[11px] text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                                            placeholder="PPI"
+                                          />
+                                        </div>
+                                      </div>
+                                    </td>
                                   )}
 
                                   {/* DELETE ROW */}
@@ -1764,10 +1770,10 @@ export default function LaserProcessing({ currentUser }: Props) {
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteColorRowFromEditing(colRow.id)}
-                                      className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all focus:outline-none cursor-pointer inline-flex items-center justify-center"
+                                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all focus:outline-none cursor-pointer"
                                       title="Elimina riga colore"
                                     >
-                                      <Trash2 size={13} />
+                                      <Trash2 size={14} />
                                     </button>
                                   </td>
                                 </tr>
@@ -1775,7 +1781,7 @@ export default function LaserProcessing({ currentUser }: Props) {
 
                               {colorRows.length === 0 && (
                                 <tr>
-                                  <td colSpan={4} className="px-2 py-6 text-center text-gray-400 italic">
+                                  <td colSpan={isX252 ? 7 : (isFibra ? 6 : 5)} className="px-2 py-6 text-center text-gray-400 italic">
                                     Nessun colore associato. Clicca su "Aggiungi" per iniziare.
                                   </td>
                                 </tr>
