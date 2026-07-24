@@ -1393,29 +1393,34 @@ export default function LaserProcessing({ currentUser }: Props) {
                         </div>
                       </div>
 
-                      {/* Grid for MODALITA, DPI, PPI - Converted to static info in the modal as requested */}
+                      {/* Grid for MODALITA, DPI, PPI */}
                       <div className="grid grid-cols-3 gap-4">
-                        {/* MODALITA text input */}
+                        {/* MODALITA dropdown */}
                         <div className="space-y-1 col-span-1">
                           <label className="block text-xs font-bold text-gray-700 uppercase">Modalità</label>
-                          <input
-                            type="text"
+                          <select
                             value={editingRow.modalita || ''}
                             onChange={(e) => setEditingRow({ ...editingRow, modalita: e.target.value })}
-                            placeholder="Es. BLACK&WHITE"
                             className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-950 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
-                          />
+                          >
+                            <option value="">Seleziona</option>
+                            <option value="BLACK&WHITE">BLACK&WHITE</option>
+                            <option value="MANUAL COLOR">MANUAL COLOR</option>
+                            <option value="3D MODE">3D MODE</option>
+                            <option value="STAMP MODE">STAMP MODE</option>
+                          </select>
                         </div>
-                        {/* DPI text input */}
+                        {/* DPI dropdown */}
                         <div className="space-y-1 col-span-1">
                           <label className="block text-xs font-bold text-gray-700 uppercase">DPI</label>
-                          <input
-                            type="text"
+                          <select
                             value={editingRow.dpi || ''}
                             onChange={(e) => setEditingRow({ ...editingRow, dpi: e.target.value })}
-                            placeholder="Es. 300"
                             className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-950 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
-                          />
+                          >
+                            <option value="">Seleziona</option>
+                            {[125, 250, 300, 380, 500, 600, 760, 1000].map(d => <option key={d} value={d}>{d}</option>)}
+                          </select>
                         </div>
                         {/* PPI numeric input */}
                         <div className="space-y-1 col-span-1">
