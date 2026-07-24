@@ -41,7 +41,7 @@ export interface Client {
   attachmentDate?: string;
   attachmentProgressive?: string;
   attachmentAmount?: number;
-  attachments?: ClientAttachment[];
+  attachments?: any[];
 }
 
 export type CostCategory = 'MATERIAL' | 'LABOR';
@@ -81,17 +81,14 @@ export interface Quotation {
   pdfUrl?: string;
   condizioni: string;
   presentationText: string;
-  attachment?: string;
-  attachmentsList?: string[];
-  attachmentDate?: string;
-  attachmentProgressive?: string;
-  attachmentAmount?: number;
   showTotal?: boolean;
   trasporto?: 'incluso' | 'a carico del cliente' | null;
   installazione?: 'inclusa' | 'da quantificare' | null;
   collaudo?: 'incluso' | 'non incluso' | null;
   validita?: string;
   isImported?: boolean;
+  attachment?: string;
+  attachmentsList?: string[];
 }
 
 export interface InvoiceLine {

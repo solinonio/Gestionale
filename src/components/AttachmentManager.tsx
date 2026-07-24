@@ -11,7 +11,8 @@ import {
   Eye, 
   X,
   Link,
-  ExternalLink
+  ExternalLink,
+  Plus
 } from 'lucide-react';
 import { getAttachments, uploadAttachment, downloadAttachment, deleteAttachment, addAttachmentLink } from '../lib/db';
 
@@ -40,6 +41,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [showPathInput, setShowPathInput] = useState(false);
   const [manualPath, setManualPath] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);

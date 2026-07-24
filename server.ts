@@ -1465,7 +1465,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             meta[attachmentId] = {
                 id: attachmentId,
                 type,
-                id: id,
+                parentId: id,
                 nome_originale: filePath,
                 percorso_file: filePath,
                 nome_file: 'manual_link',
@@ -1534,7 +1534,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             if (fs.existsSync(attachmentsPath)) {
                 const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
                 attachments = Object.entries(meta)
-                    .filter(([_, v]: any) => v.type === type && v.id === id)
+                    .filter(([_, v]: any) => v.type === type && (v.parentId === id || v.id === id))
                     .map(([k, v]: any) => ({ id: k, ...v }));
             }
         }

@@ -67,134 +67,9 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
       { id: 'allegati', label: 'Allegati', icon: <FolderOpen size={16} /> },
   ] as const;
 
-  const [attachment, setAttachment] = useState<string | null>(props.editingQuotation?.attachment || null);
-  const [attachmentsList, setAttachmentsList] = useState<string[]>(
-    props.editingQuotation?.attachmentsList || 
-    (props.editingQuotation?.attachment ? [props.editingQuotation.attachment] : [])
-  );
-  const [isNasLink, setIsNasLink] = useState(isNasLinkPath(props.editingQuotation?.attachment || null));
-  const [nasPathInput, setNasPathInput] = useState(isNasLinkPath(props.editingQuotation?.attachment || null) ? props.editingQuotation?.attachment || '' : '');
   const [isUploading, setIsUploading] = useState(false);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [activeViewerPath, setActiveViewerPath] = useState<string | null>(null);
-  const [isNasConnected, setIsNasConnected] = useState(false);
-  const [nasRootPath, setNasRootPath] = useState(localStorage.getItem('nas_root_path') || '\\\\NAS\\Preventivi\\');
-
-  useEffect(() => {
-    getNasFolderHandle().then(handle => {
-      setIsNasConnected(!!handle);
-    });
-  }, []);
-
-  const handleConnectNas = async () => {
-    const handle = await connectNasFolder();
-    if (handle) {
-      setIsNasConnected(true);
-      
-      // Tentiamo di suggerire un percorso basato sul nome della cartella selezionata
-      const folderName = handle.name;
-      const suggestion = `\\\\NAS\\${folderName}\\`;
-      
-      // Aggiorna direttamente la radice senza prompt, come richiesto dall'utente
-      localStorage.setItem('nas_root_path', suggestion);
-      setNasRootPath(suggestion);
-      
-      alert(`Cartella NAS "${folderName}" connessa e impostata come radice!`);
-    }
-  };
-
-  const handleViewNasPdf = async (path: string) => {
-    try {
-      const file = await getFileFromNas(path);
-      if (file) {
-        const url = URL.createObjectURL(file);
-        setActiveViewerPath(url);
-      } else {
-        alert("Impossibile trovare il file sul NAS. Verifica che la cartella sia connessa.");
-      }
-    } catch (err) {
-      console.error("Errore visualizzazione PDF:", err);
-    }
-  };
-
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  const [stagedLocalPath, setStagedLocalPath] = useState<string>('');
-  const [pathCopiedFeedback, setPathCopiedFeedback] = useState<boolean>(false);
-
-  const handleLocalFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Support both real mime-type and extension check
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith('.pdf')) {
-      alert("Formato non valido. Sono ammessi solo file PDF.");
-      return;
-    }
-
-    const filename = file.name;
-    setSelectedFileName(filename);
-
-    // Format local network path suggestion (using double backslash for SMB/NAS)
-    const suggestedPath = `${nasRootPath}${filename}`;
-    setStagedLocalPath(suggestedPath);
-  };
-
-  const handleConfirmLocalPath = () => {
-    if (!stagedLocalPath.trim()) {
-      alert("Nessun percorso da confermare. Seleziona prima un file.");
-      return;
-    }
-
-    const finalPath = stagedLocalPath.trim();
-    if (attachmentsList.includes(finalPath)) {
-      alert("Questo percorso è già presente nella lista degli allegati.");
-      return;
-    }
-
-    setAttachmentsList(prev => [...prev, finalPath]);
-    setSelectedFileName(null);
-    setStagedLocalPath('');
-
-    alert(`Successo!\nIl percorso di rete:\n\n${finalPath}\n\nè stato aggiunto alla lista degli allegati. Ricorda di salvare il preventivo per memorizzarlo stabilmente.`);
-  };
-
-  const handleQuotationFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== "application/pdf") {
-      alert("Formato non valido. Sono ammessi solo file PDF.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("pdf", file);
-
-    try {
-      setIsUploading(true);
-      const response = await fetch("/api/upload-pdf", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
-      }
-
-      const result = await response.json();
-      if (result.success) {
-        setAttachment(result.path);
-      } else {
-        alert("Errore caricamento: " + result.error);
-      }
-    } catch (err) {
-      console.error("Errore upload:", err);
-      alert(`Errore durante l'invio del file: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsUploading(false);
-    }
-  };
 
   const [quotationDate, setQuotationDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState<string>('');
@@ -642,12 +517,6 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
         setNotes(props.editingQuotation.notes || '');
         setInternalNotes(props.editingQuotation.internalNotes || '');
         setShowTotal(props.editingQuotation.showTotal !== false);
-        const hasAttachment = props.editingQuotation.attachment || null;
-        setAttachment(hasAttachment);
-        const loadedAttachments = props.editingQuotation.attachmentsList || (hasAttachment ? [hasAttachment] : []);
-        setAttachmentsList(loadedAttachments);
-        setIsNasLink(isNasLinkPath(hasAttachment));
-        setNasPathInput(isNasLinkPath(hasAttachment) ? hasAttachment || '' : '');
         
         const rawNum = props.editingQuotation.number || '';
         const separatorIndex = rawNum.indexOf('/') !== -1 ? rawNum.indexOf('/') : rawNum.indexOf('-');
@@ -683,12 +552,6 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
             setCustomTotal(null);
         }
     } else {
-        setAttachment(null);
-        setAttachmentsList([]);
-        setIsNasLink(false);
-        setNasPathInput('');
-        setSelectedFileName(null);
-        setStagedLocalPath('');
         setTrasporto('incluso');
         setInstallazione('inclusa');
         setCollaudo('incluso');
@@ -1126,9 +989,7 @@ Ecco il testo del PDF da analizzare:
             trasporto,
             installazione,
             collaudo,
-            validita,
-            attachment: attachmentsList.length > 0 ? attachmentsList[0] : undefined,
-            attachmentsList: attachmentsList.length > 0 ? attachmentsList : undefined
+            validita
         };
 
         if (props.editingQuotation && props.editingQuotation.id) {
@@ -1555,166 +1416,18 @@ Ecco il testo del PDF da analizzare:
                     <span>Gestione Allegati Preventivo</span>
                   </h3>
                   
-                  {/* REAL SERVER UPLOADS SECTION */}
+                  {/* GESTIONE ALLEGATI UNIFICATA */}
                   <div className="bg-white p-5 rounded-lg border border-blue-200 shadow-sm">
                     <AttachmentManager 
                       type="quotation" 
                       id={props.editingQuotation?.id || 'new'} 
-                      title="File Salvati sul Server"
+                      title="Allegati Preventivo"
                     />
-                    <p className="mt-2 text-[9px] text-gray-500 italic">
-                      * Questi file sono caricati fisicamente sul server e sono accessibili da qualsiasi postazione.
+                    <p className="mt-3 text-[10px] text-gray-500 italic leading-tight">
+                      * Carica i file direttamente o usa il pulsante <strong>INSERISCI PERCORSO</strong> per collegare file sul NAS o sulla rete locale senza caricarli.
                     </p>
                   </div>
-
-                  <hr className="border-gray-300 my-4" />
-
-                  <p className="text-xs text-gray-650 leading-relaxed max-w-3xl">
-                    <strong>Gestione NAS (Legacy):</strong> Se preferisci non caricare i file sul server, puoi continuare ad utilizzare i collegamenti ai file presenti nel tuo NAS locale.
-                  </p>
-
-                  <div className="bg-white p-5 rounded-lg border border-gray-300">
-                    <div className="space-y-4">
-                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-2 border-b border-gray-200">
-                        <div className="flex flex-col gap-1">
-                          <h4 className="font-bold text-xs text-blue-800 uppercase tracking-wider flex items-center gap-2">
-                            <Paperclip size={14} />
-                            Gestione Allegati NAS ({attachmentsList.length})
-                          </h4>
-                          <div className="flex items-center gap-2 mt-1">
-                            <button
-                              type="button"
-                              onClick={handleConnectNas}
-                              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${isNasConnected ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-orange-100 text-orange-700 border border-orange-200 hover:bg-orange-200'}`}
-                            >
-                              <Settings size={12} />
-                              <span>{isNasConnected ? "NAS ON" : "CONNETTI NAS"}</span>
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const input = document.createElement('input');
-                              input.type = 'file';
-                              input.multiple = true;
-                              input.accept = 'application/pdf';
-                              input.onchange = (e) => {
-                                const files = (e.target as HTMLInputElement).files;
-                                if (files) {
-                                  const newPaths: string[] = [];
-                                  const root = nasRootPath;
-                                  for (let i = 0; i < files.length; i++) {
-                                    const fileName = files[i].name;
-                                    const fullPath = `${root}${fileName}`;
-                                    if (!attachmentsList.includes(fullPath)) {
-                                      newPaths.push(fullPath);
-                                    }
-                                  }
-                                  if (newPaths.length > 0) {
-                                    setAttachmentsList(prev => [...prev, ...newPaths]);
-                                  }
-                                }
-                              };
-                              input.click();
-                            }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded-lg text-[10px] transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
-                          >
-                            <FileUp size={14} />
-                            <span>Aggiungi File dal NAS...</span>
-                          </button>
-                          
-                          {attachmentsList.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (confirm("Sei sicuro di voler rimuovere TUTTI gli allegati?")) {
-                                  setAttachmentsList([]);
-                                }
-                              }}
-                              className="text-[10px] font-bold text-red-600 hover:text-red-800 transition-colors cursor-pointer border border-red-200 px-2 py-1.5 rounded-lg"
-                            >
-                              Svuota tutto
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="bg-blue-50/50 p-3 rounded-lg border border-blue-100 flex flex-col md:flex-row gap-3 items-center">
-                        <div className="flex-1 space-y-1 w-full">
-                          <label className="text-[10px] font-bold text-blue-700 uppercase">Radice Percorso NAS predefinita</label>
-                          <input 
-                            type="text" 
-                            placeholder="Es: \\NAS\Preventivi\"
-                            className="w-full bg-white border border-blue-200 rounded px-2 py-1 text-xs font-mono"
-                            value={nasRootPath}
-                            onChange={(e) => {
-                              const newPath = e.target.value;
-                              setNasRootPath(newPath);
-                              localStorage.setItem('nas_root_path', newPath);
-                            }}
-                          />
-                        </div>
-                        <p className="text-[9px] text-blue-600 max-w-[200px] leading-tight italic">
-                          Nota: I file non vengono caricati sul server. Salviamo solo il link per permetterti di ritrovarli sul NAS.
-                        </p>
-                      </div>
-
-                        {attachmentsList.length > 0 ? (
-                          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                            {attachmentsList.map((pathStr, idx) => {
-                              const isNas = isNasLinkPath(pathStr);
-                              const filename = getFileNameFromPath(pathStr);
-                              return (
-                                <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg group hover:border-blue-300 transition-all">
-                                  <div className={`p-2 bg-white rounded border border-gray-200 ${isNas ? 'text-purple-600' : 'text-red-600'}`}>
-                                    {isNas ? <HardDrive size={18} /> : <FileText size={18} />}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-bold text-gray-900 truncate">
-                                      {filename}
-                                    </p>
-                                    <p className="text-[10px] text-gray-500 truncate font-mono">
-                                      {pathStr}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleViewNasPdf(pathStr)}
-                                      className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-md transition-colors cursor-pointer flex items-center gap-1"
-                                      title="Visualizza PDF"
-                                    >
-                                      <Eye size={14} />
-                                      <span className="text-[9px] font-bold uppercase">Visualizza</span>
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setAttachmentsList(prev => prev.filter((_, i) => i !== idx));
-                                      }}
-                                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
-                                      title="Rimuovi associazione"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="text-center py-10 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
-                            <Paperclip size={32} className="mx-auto text-gray-300 mb-3" />
-                            <p className="text-xs font-medium text-gray-500">Nessun allegato associato a questo preventivo.</p>
-                            <p className="text-[10px] text-gray-400 mt-1">Usa il pulsante in alto per aggiungere file dal tuo NAS.</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                </div>
             )}
 
         </div>
