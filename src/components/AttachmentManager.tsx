@@ -12,7 +12,9 @@ import {
   X,
   Link,
   ExternalLink,
-  Plus
+  Plus,
+  Settings,
+  HardDrive
 } from 'lucide-react';
 import { getAttachments, uploadAttachment, downloadAttachment, deleteAttachment, addAttachmentLink } from '../lib/db';
 
@@ -43,6 +45,9 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPathInput, setShowPathInput] = useState(false);
+  const [showNasConfig, setShowNasConfig] = useState(false);
+  const [nasRoot, setNasRoot] = useState(localStorage.getItem('nas_root_path') || '\\\\NAS\\Upload\\');
+  const [isNasMode, setIsNasMode] = useState(localStorage.getItem('nas_mode') === 'true');
   const [manualPath, setManualPath] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -101,7 +106,15 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
     setError(null);
     try {
       for (let i = 0; i < files.length; i++) {
-        await uploadAttachment(files[i], type, id);
+        const file = files[i];
+        if (isNasMode) {
+          // Modalità NAS Automatica: non carica il file, salva solo il percorso
+          const fullPath = `${nasRoot}${file.name}`;
+          await addAttachmentLink(fullPath, type, id);
+        } else {
+          // Modalità standard: carica il file sul server
+          await uploadAttachment(file, type, id);
+        }
       }
       await loadAttachments();
     } catch (err: any) {
@@ -160,6 +173,15 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
         </h4>
         <div className="flex items-center gap-2">
            {uploading && <Loader2 size={14} className="animate-spin text-blue-600" />}
+           
+           <button 
+             onClick={() => setShowNasConfig(!showNasConfig)}
+             className={`p-1.5 rounded transition-colors ${isNasMode ? 'bg-orange-100 text-orange-600 border border-orange-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+             title="Configurazione NAS"
+           >
+             <Settings size={14} />
+           </button>
+
            <button 
              onClick={() => setShowPathInput(!showPathInput)}
              className="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-[10px] font-bold transition-colors"
@@ -173,7 +195,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
              className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold transition-colors disabled:opacity-50"
            >
              <Plus size={12} />
-             CARICA FILE
+             {isNasMode ? 'AGGIUNGI DAL NAS' : 'CARICA FILE'}
            </button>
            <input 
              type="file" 
@@ -184,6 +206,57 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
            />
         </div>
       </div>
+
+      {showNasConfig && (
+        <div className="p-3 bg-orange-50 border border-orange-100 rounded-md space-y-3">
+          <div className="flex items-center justify-between">
+            <h5 className="text-[10px] font-bold text-orange-800 uppercase flex items-center gap-1">
+              <HardDrive size={12} />
+              Configurazione NAS Automatica
+            </h5>
+            <button onClick={() => setShowNasConfig(false)} className="text-orange-400 hover:text-orange-600">
+              <X size={14} />
+            </button>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer" 
+                  checked={isNasMode}
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setIsNasMode(val);
+                    localStorage.setItem('nas_mode', String(val));
+                  }}
+                />
+                <div className="w-7 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-orange-500"></div>
+              </label>
+              <span className="text-[10px] font-bold text-orange-900">Attiva Collegamento Automatico NAS</span>
+            </div>
+            
+            <div className="space-y-1">
+              <label className="text-[9px] font-bold text-orange-700 uppercase">Percorso Radice NAS (es: \\NAS\Preventivi\)</label>
+              <input 
+                type="text"
+                value={nasRoot}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setNasRoot(val);
+                  localStorage.setItem('nas_root_path', val);
+                }}
+                className="w-full px-2 py-1.5 text-[11px] font-mono border border-orange-200 rounded outline-none focus:border-orange-500"
+                placeholder="\\NAS\Documenti\"
+              />
+            </div>
+            <p className="text-[9px] text-orange-600 italic leading-tight">
+              Quando questa modalità è attiva, selezionando un file verrà salvato solo il collegamento al percorso NAS impostato, senza caricare il file sul server.
+            </p>
+          </div>
+        </div>
+      )}
 
       {showPathInput && (
         <div className="p-3 bg-blue-50 border border-blue-100 rounded-md space-y-2">
