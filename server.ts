@@ -1434,33 +1434,6 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     }
   });
 
-  app.get("/api/attachments/:type/:id", async (req, res) => {
-    try {
-        const { type, id } = req.params;
-        const config = getDbConfig();
-        
-        let attachments: any[] = [];
-        
-        if (config.dbType === 'mariadb') {
-            const pool = await getMariaPool(config);
-            const query = type === 'client' ? "SELECT * FROM allegati_clienti WHERE cliente_id = ?" : "SELECT * FROM allegati_preventivi WHERE preventivo_id = ?";
-            const [rows]: any = await pool.query(query, [id]);
-            attachments = rows;
-        } else {
-            const attachmentsPath = path.join(path.dirname(getDbPath()), 'attachments_meta.json');
-            if (fs.existsSync(attachmentsPath)) {
-                const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
-                attachments = Object.entries(meta)
-                    .filter(([_, v]: any) => v.type === type && v.id === id)
-                    .map(([k, v]: any) => ({ id: k, ...v }));
-            }
-        }
-        res.json({ success: true, attachments });
-    } catch (err: any) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
   app.get("/api/attachments/download/:id", async (req, res) => {
     try {
         const { id } = req.params;
@@ -1491,6 +1464,33 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
         }
 
         res.download(absolutePath, originalName);
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.get("/api/attachments/:type/:id", async (req, res) => {
+    try {
+        const { type, id } = req.params;
+        const config = getDbConfig();
+        
+        let attachments: any[] = [];
+        
+        if (config.dbType === 'mariadb') {
+            const pool = await getMariaPool(config);
+            const query = type === 'client' ? "SELECT * FROM allegati_clienti WHERE cliente_id = ?" : "SELECT * FROM allegati_preventivi WHERE preventivo_id = ?";
+            const [rows]: any = await pool.query(query, [id]);
+            attachments = rows;
+        } else {
+            const attachmentsPath = path.join(path.dirname(getDbPath()), 'attachments_meta.json');
+            if (fs.existsSync(attachmentsPath)) {
+                const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
+                attachments = Object.entries(meta)
+                    .filter(([_, v]: any) => v.type === type && v.id === id)
+                    .map(([k, v]: any) => ({ id: k, ...v }));
+            }
+        }
+        res.json({ success: true, attachments });
     } catch (err: any) {
         res.status(500).json({ success: false, error: err.message });
     }
