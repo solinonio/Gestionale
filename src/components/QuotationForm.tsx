@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CompanyInfo, Client, Quotation, QuotationRow, InternalRow } from '../types';
 import { Plus, Save, FileText, Eye, EyeOff, Download, FolderOpen, HelpCircle, X, User, Zap, Brain, MessageSquare, Notebook, Trash2, Bold, List, Paperclip, Loader2, FileUp, HardDrive, Copy, Check, ExternalLink, Settings } from 'lucide-react';
 import { getCompanyProfile, saveQuotation, getQuotations, updateQuotation, getClients, addClient, getAttachments, uploadAttachment, downloadAttachment, deleteAttachment } from '../lib/db';
+import { AttachmentManager } from './AttachmentManager';
 import { connectNasFolder, getFileFromNas, getNasFolderHandle } from '../lib/nasBridge';
 import QuillEditor from './QuillEditor';
 import ClientSelectorPopup from './ClientSelectorPopup';
@@ -1545,7 +1546,7 @@ Ecco il testo del PDF da analizzare:
             )}
 
             {activeTab === 'allegati' && (
-                <div className="bg-gray-100 p-6 rounded-lg shadow-sm border border-gray-300 space-y-4">
+                <div className="bg-gray-100 p-6 rounded-lg shadow-sm border border-gray-300 space-y-4 text-gray-900">
                   <div className='flex justify-end mb-2'>
                       <button onClick={() => setActiveTab(null)} className="text-gray-700 hover:text-gray-900 text-sm cursor-pointer font-semibold bg-white border border-gray-300 px-3 py-1 rounded shadow-sm hover:bg-gray-50">Chiudi</button>
                   </div>
@@ -1553,8 +1554,23 @@ Ecco il testo del PDF da analizzare:
                     <FolderOpen className="text-blue-700" size={22} />
                     <span>Gestione Allegati Preventivo</span>
                   </h3>
+                  
+                  {/* REAL SERVER UPLOADS SECTION */}
+                  <div className="bg-white p-5 rounded-lg border border-blue-200 shadow-sm">
+                    <AttachmentManager 
+                      type="quotation" 
+                      id={props.editingQuotation?.id || 'new'} 
+                      title="File Salvati sul Server"
+                    />
+                    <p className="mt-2 text-[9px] text-gray-500 italic">
+                      * Questi file sono caricati fisicamente sul server e sono accessibili da qualsiasi postazione.
+                    </p>
+                  </div>
+
+                  <hr className="border-gray-300 my-4" />
+
                   <p className="text-xs text-gray-650 leading-relaxed max-w-3xl">
-                    Questo pannello ti consente di associare molteplici file PDF o collegamenti di rete locale (NAS) a questo preventivo. Puoi scegliere un file dal computer per copiare automaticamente il percorso consigliato negli appunti, oppure inserire manualmente qualsiasi percorso o indirizzo web.
+                    <strong>Gestione NAS (Legacy):</strong> Se preferisci non caricare i file sul server, puoi continuare ad utilizzare i collegamenti ai file presenti nel tuo NAS locale.
                   </p>
 
                   <div className="bg-white p-5 rounded-lg border border-gray-300">

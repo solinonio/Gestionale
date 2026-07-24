@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getClients, addClient, updateClient, getQuotationsByClient, deleteClient } from '../lib/db';
 import { Client, Quotation } from '../types';
-import { Plus, Search, Loader2, Trash2, Check } from 'lucide-react';
+import { Plus, Search, Loader2, Trash2, Check, Paperclip } from 'lucide-react';
 import QuotationForm from './QuotationForm';
+import { AttachmentManager } from './AttachmentManager';
 
 interface Props {
   initialSelectedClientId?: string | null;
@@ -323,6 +324,17 @@ export default function ClientManager({
           <input placeholder="Città" className="p-2 border rounded bg-white text-gray-900" value={clientForm.city} onChange={e => setClientForm({...clientForm, city: e.target.value})} />
           <input placeholder="P.IVA" className="p-2 border rounded bg-white text-gray-900" value={clientForm.vatNumber} onChange={e => setClientForm({...clientForm, vatNumber: e.target.value})} />
           <input placeholder="Codice Univoco" className="p-2 border rounded bg-white text-gray-900" value={clientForm.sdiCode} onChange={e => setClientForm({...clientForm, sdiCode: e.target.value})} />
+          
+          {editingClient && editingClient.id && (
+            <div className="col-span-2 mt-2 pt-4 border-t border-gray-200">
+              <AttachmentManager 
+                type="client" 
+                id={editingClient.id} 
+                title="Allegati Cliente"
+              />
+            </div>
+          )}
+
           <button type="submit" className="col-span-2 bg-green-600 text-white p-2 rounded hover:bg-green-700 cursor-pointer font-bold">{editingClient ? 'Aggiorna Cliente' : 'Salva Cliente'}</button>
         </form>
       )}

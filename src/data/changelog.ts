@@ -11,6 +11,26 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.6.4",
+    date: "2026-07-24",
+    title: "Gestionale v3.6.4 - Gestione Allegati Server Robustizzata",
+    type: "patch",
+    changes: [
+      {
+        category: "feature",
+        text: "Upload Allegati: Implementato caricamento reale di file (PDF, Immagini, Documenti) sul server, superando il vecchio limite dei soli collegamenti NAS."
+      },
+      {
+        category: "improvement",
+        text: "Portabilità: I percorsi dei file sono ora memorizzati come relativi, permettendo la migrazione del database tra diverse installazioni MariaDB senza perdere gli allegati."
+      },
+      {
+        category: "feature",
+        text: "Gestione Clienti: Aggiunta sezione allegati direttamente nella scheda anagrafica del cliente."
+      }
+    ]
+  },
+  {
     version: "3.6.3",
     date: "2026-07-24",
     title: "Gestionale v3.6.3 - Gestione Nomi Lavorazione",

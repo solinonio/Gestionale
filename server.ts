@@ -10,22 +10,32 @@ import multer from 'multer';
 import AdmZip from 'adm-zip';
 
 // Configure multer
-const uploadDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+const UPLOAD_ROOT = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(UPLOAD_ROOT)) {
+  fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
 }
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const { type, id } = req.params;
-    const targetDir = path.join(uploadDir, type === 'client' ? 'Clienti' : 'Preventivi', id || 'unknown');
+    // Unify subdirectories: type can be 'client', 'quotation', or a generic category
+    const subDir = type === 'client' ? 'Clienti' : (type === 'quotation' ? 'Preventivi' : type);
+    const targetDir = path.join(UPLOAD_ROOT, subDir, id || 'unknown');
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
     cb(null, targetDir);
   },
-  filename: (req, file, cb) => cb(null, `${crypto.randomUUID()}-${file.originalname}`)
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, `${uniqueSuffix}-${file.originalname}`);
+  }
 });
-const upload = multer({ storage: storage, limits: { fileSize: 2 * 1024 * 1024 } });
+
+const upload = multer({ 
+  storage: storage, 
+  limits: { fileSize: 10 * 1024 * 1024 } // Increase to 10MB
+});
 
 function getFallbackCompany(query: string) {
   const cleanQuery = query.trim();
@@ -1391,18 +1401,16 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
       const file = req.file;
       console.log("File received:", file);
       if (!file) return res.status(400).json({ success: false, error: "Nessun file caricato" });
-      if (file.mimetype !== 'application/pdf') {
-        console.warn("Invalid mimetype:", file.mimetype);
-        fs.unlinkSync(file.path);
-        return res.status(400).json({ success: false, error: "Solo file PDF consentiti" });
-      }
-
+      
       const config = getDbConfig();
+      // Store relative path for portability
+      const relativePath = path.relative(UPLOAD_ROOT, file.path);
+      
       const insertQuery = type === 'client' 
         ? "INSERT INTO allegati_clienti (cliente_id, nome_file, nome_originale, percorso_file, dimensione) VALUES (?, ?, ?, ?, ?)"
         : "INSERT INTO allegati_preventivi (preventivo_id, nome_file, nome_originale, percorso_file, dimensione) VALUES (?, ?, ?, ?, ?)";
       
-      const insertParams = [id, file.filename, file.originalname, file.path, file.size];
+      const insertParams = [id, file.filename, file.originalname, relativePath, file.size];
 
       let insertedId = null;
       if (config.dbType === 'mariadb') {
@@ -1415,11 +1423,11 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
         let meta: any = {};
         if (fs.existsSync(attachmentsPath)) meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
         insertedId = crypto.randomUUID();
-        meta[insertedId] = { type, id, ...file, data_caricamento: new Date() };
+        meta[insertedId] = { type, id, ...file, path: relativePath, data_caricamento: new Date() };
         fs.writeFileSync(attachmentsPath, JSON.stringify(meta, null, 2), "utf-8");
       }
 
-      res.json({ success: true, file, attachmentId: insertedId });
+      res.json({ success: true, file, attachmentId: insertedId, relativePath });
     } catch (err: any) {
       console.error("Errore upload:", err);
       res.status(500).json({ success: false, error: err.message });
@@ -1458,25 +1466,31 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
         const { id } = req.params;
         const config = getDbConfig();
         
-        let filePath = "";
+        let relativeFilePath = "";
         let originalName = "";
 
         if (config.dbType === 'mariadb') {
             const pool = await getMariaPool(config);
             const [rows]: any = await pool.query("SELECT percorso_file, nome_originale FROM allegati_clienti WHERE id = ? UNION SELECT percorso_file, nome_originale FROM allegati_preventivi WHERE id = ?", [id, id]);
             if (rows.length === 0) return res.status(404).json({ success: false, error: "File non trovato" });
-            filePath = rows[0].percorso_file;
+            relativeFilePath = rows[0].percorso_file;
             originalName = rows[0].nome_originale;
         } else {
             const attachmentsPath = path.join(path.dirname(getDbPath()), 'attachments_meta.json');
             const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
             const entry = meta[id];
             if (!entry) return res.status(404).json({ success: false, error: "File non trovato" });
-            filePath = entry.path;
+            relativeFilePath = entry.path;
             originalName = entry.originalname;
         }
         
-        res.download(filePath, originalName);
+        const absolutePath = path.isAbsolute(relativeFilePath) ? relativeFilePath : path.join(UPLOAD_ROOT, relativeFilePath);
+        
+        if (!fs.existsSync(absolutePath)) {
+            return res.status(404).json({ success: false, error: "File fisico non trovato sul server" });
+        }
+
+        res.download(absolutePath, originalName);
     } catch (err: any) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -1719,21 +1733,15 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
   // ==========================================
   // CONFIGURAZIONE CARICAMENTO E GESTIONE PDF
   // ==========================================
-  const uploadDir = path.join(process.cwd(), "data", "uploads");
-  try {
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-  } catch (e) {
-    console.error("[Server] Errore creazione cartella uploads:", e);
-  }
-
   const pdfStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-      cb(null, uploadDir);
+      const pdfDir = path.join(UPLOAD_ROOT, "pdf_staged");
+      if (!fs.existsSync(pdfDir)) {
+        fs.mkdirSync(pdfDir, { recursive: true });
+      }
+      cb(null, pdfDir);
     },
     filename: (req, file, cb) => {
-      // Genera un nome univoco basato sul timestamp per evitare sovrascritture
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
       cb(null, uniqueSuffix + path.extname(file.originalname));
     }
@@ -1775,7 +1783,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
         success: true, 
         filename: req.file.filename,
         originalName: req.file.originalname,
-        path: `/uploads/${req.file.filename}` // Questo percorso lo salverai nel tuo database JSON/MariaDB
+        path: `/uploads/pdf_staged/${req.file.filename}` // Questo percorso lo salverai nel tuo database JSON/MariaDB
       });
     });
   });
@@ -1784,19 +1792,19 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
   app.get("/api/export-uploads", (req, res) => {
     console.log("[Server] Richiesta ricevuta su /api/export-uploads");
     try {
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
+      if (!fs.existsSync(UPLOAD_ROOT)) {
+        fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
       }
 
       const zip = new AdmZip();
       
       // Controlliamo se la cartella contiene file prima di aggiungerla
-      const files = fs.readdirSync(uploadDir);
+      const files = fs.readdirSync(UPLOAD_ROOT);
       if (files.length === 0) {
         // Se la cartella è vuota, aggiungiamo un file leggimi per evitare errori e indicare che è vuota
         zip.addFile("README.txt", Buffer.from("Cartella uploads vuota. Nessun allegato presente.", "utf8"));
       } else {
-        zip.addLocalFolder(uploadDir);
+        zip.addLocalFolder(UPLOAD_ROOT);
       }
 
       const zipBuffer = zip.toBuffer();
@@ -1812,8 +1820,8 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     }
   });
 
-  // Rende la cartella 'uploads' accessibile pubblicamente via browser per poter scaricare/vedere i PDF
-  app.use("/uploads", express.static(uploadDir));
+  // Rende la cartella 'uploads' accessibile pubblicamente via browser
+  app.use("/uploads", express.static(UPLOAD_ROOT));
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createServer({
