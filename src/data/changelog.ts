@@ -11,6 +11,26 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.6.0",
+    date: "2026-07-24",
+    title: "Gestionale v3.6.0 - Database Materiali MariaDB e UI Laser XL",
+    type: "minor",
+    changes: [
+      {
+        category: "feature",
+        text: "Database Materiali: Migrata la gestione materiali su una tabella MariaDB dedicata. Tutti i dati (fornitore, prezzo, dimensioni) sono ora persistenti sul server."
+      },
+      {
+        category: "improvement",
+        text: "UI Laser XL: Ingrandita la scheda lavorazione del 5% per una visualizzazione ottimale dei parametri. Rimossi i menu a tendina ridondanti per Modalità, DPI e PPI, ora inseribili come testo o ereditati."
+      },
+      {
+        category: "improvement",
+        text: "Logica Colori: Cliccando su un colore esistente nella scheda colori associati, tutti i parametri correnti (Velocità, Potenza, Modalità, DPI, PPI) vengono ora sovrascritti forzatamente con i valori della scheda principale."
+      }
+    ]
+  },
+  {
     version: "3.5.3",
     date: "2026-07-23",
     title: "Gestionale v3.5.3 - Logica Salvataggio Colori Avanzata",

@@ -4,12 +4,12 @@ import {
   Globe, Ruler, Sparkles, RefreshCw, Save, X, ArrowLeft, Copy
 } from 'lucide-react';
 import { 
-  getSharedMaterials, 
-  addSharedMaterial, 
-  updateSharedMaterial, 
-  deleteSharedMaterial 
+  getMateriali, 
+  addMateriale, 
+  updateMateriale, 
+  deleteMateriale 
 } from '../lib/db';
-import { SharedMaterial } from '../types';
+import { Materiale } from '../types';
 
 interface Props {
   setActiveTab?: (tab: any) => void;
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export default function MaterialManager({ setActiveTab }: Props) {
-  const [materials, setMaterials] = useState<SharedMaterial[]>([]);
+  const [materials, setMaterials] = useState<Materiale[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,12 +37,12 @@ export default function MaterialManager({ setActiveTab }: Props) {
   const loadMaterials = async () => {
     setLoading(true);
     try {
-      const data = await getSharedMaterials();
-      const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name, 'it', { sensitivity: 'base' }));
+      const data = await getMateriali();
+      const sorted = [...data].sort((a, b) => a.nome.localeCompare(b.nome, 'it', { sensitivity: 'base' }));
       setMaterials(sorted);
       setError(null);
     } catch (err) {
-      console.error('Errore nel caricamento dei materiali condivisi:', err);
+      console.error('Errore nel caricamento dei materiali:', err);
       setError('Impossibile caricare i materiali dal database.');
     } finally {
       setLoading(false);
@@ -79,24 +79,24 @@ export default function MaterialManager({ setActiveTab }: Props) {
       return;
     }
 
-    const materialData: Omit<SharedMaterial, 'id'> = {
-      name: name.trim(),
-      thickness: thicknessMm,
-      cost: cost === '' ? undefined : Number(cost),
+    const materialData: Omit<Materiale, 'id'> = {
+      nome: name.trim(),
+      spessore: thicknessMm,
+      prezzoLastra: cost === '' ? undefined : Number(cost),
       // Store internally in cm (mm / 10) to keep compatibility with existing simulator features
-      length: lengthMm / 10,
-      width: widthMm / 10,
-      link: link.trim(),
-      supplier: supplier.trim()
+      lunghezza: lengthMm / 10,
+      larghezza: widthMm / 10,
+      linkSchedaTecnica: link.trim(),
+      fornitore: supplier.trim()
     };
 
     try {
       if (editingId) {
-        await updateSharedMaterial(editingId, materialData);
+        await updateMateriale(editingId, materialData);
         alert('Materiale aggiornato con successo!');
       } else {
-        await addSharedMaterial(materialData);
-        alert('Materiale salvato e condiviso con successo!');
+        await addMateriale(materialData);
+        alert('Materiale salvato con successo!');
       }
       resetForm();
       loadMaterials();
@@ -106,16 +106,16 @@ export default function MaterialManager({ setActiveTab }: Props) {
     }
   };
 
-  const handleEditInit = (mat: SharedMaterial) => {
+  const handleEditInit = (mat: Materiale) => {
     setEditingId(mat.id);
-    setName(mat.name);
-    setThicknessMm(mat.thickness);
+    setName(mat.nome);
+    setThicknessMm(mat.spessore);
     // Convert cm back to mm for input form
-    setLengthMm((mat.length || 0) * 10);
-    setWidthMm((mat.width || 0) * 10);
-    setCost(mat.cost !== undefined ? mat.cost : '');
-    setSupplier(mat.supplier || '');
-    setLink(mat.link || '');
+    setLengthMm((mat.lunghezza || 0) * 10);
+    setWidthMm((mat.larghezza || 0) * 10);
+    setCost(mat.prezzoLastra !== undefined ? mat.prezzoLastra : '');
+    setSupplier(mat.fornitore || '');
+    setLink(mat.linkSchedaTecnica || '');
     
     // Scroll smoothly to form
     const formElement = document.getElementById('material-form-container');
@@ -127,7 +127,7 @@ export default function MaterialManager({ setActiveTab }: Props) {
   const handleDelete = async (id: string, name: string) => {
     if (confirm(`Sei sicuro di voler eliminare il materiale "${name}"?`)) {
       try {
-        await deleteSharedMaterial(id);
+        await deleteMateriale(id);
         loadMaterials();
       } catch (err) {
         console.error(err);
@@ -136,18 +136,18 @@ export default function MaterialManager({ setActiveTab }: Props) {
     }
   };
 
-  const handleDuplicate = async (mat: SharedMaterial) => {
+  const handleDuplicate = async (mat: Materiale) => {
     try {
-      const duplicateData: Omit<SharedMaterial, 'id'> = {
-        name: `${mat.name} (Copia)`,
-        thickness: mat.thickness,
-        cost: mat.cost,
-        length: mat.length,
-        width: mat.width,
-        link: mat.link,
-        supplier: mat.supplier
+      const duplicateData: Omit<Materiale, 'id'> = {
+        nome: `${mat.nome} (Copia)`,
+        spessore: mat.spessore,
+        prezzoLastra: mat.prezzoLastra,
+        lunghezza: mat.lunghezza,
+        larghezza: mat.larghezza,
+        linkSchedaTecnica: mat.linkSchedaTecnica,
+        fornitore: mat.fornitore
       };
-      await addSharedMaterial(duplicateData);
+      await addMateriale(duplicateData);
       alert('Materiale duplicato con successo!');
       loadMaterials();
     } catch (err) {
@@ -157,8 +157,8 @@ export default function MaterialManager({ setActiveTab }: Props) {
   };
 
   const filteredMaterials = materials.filter(m =>
-    m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (m.supplier && m.supplier.toLowerCase().includes(searchQuery.toLowerCase()))
+    m.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (m.fornitore && m.fornitore.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const ensureAbsoluteUrl = (url: string) => {
@@ -468,39 +468,39 @@ export default function MaterialManager({ setActiveTab }: Props) {
               </thead>
               <tbody className="divide-y divide-gray-800/60 text-sm">
                 {filteredMaterials.map((mat) => {
-                  const lengthInMm = (mat.length || 0) * 10;
-                  const widthInMm = (mat.width || 0) * 10;
+                  const lengthInMm = (mat.lunghezza || 0) * 10;
+                  const widthInMm = (mat.larghezza || 0) * 10;
                   return (
                     <tr 
                       key={mat.id} 
                       className={`hover:bg-gray-850/60 transition-colors ${editingId === mat.id ? 'bg-blue-950/20' : ''}`}
                     >
                       <td className="px-5 py-3.5">
-                        <span className="font-semibold text-white">{mat.name}</span>
+                        <span className="font-semibold text-white">{mat.nome}</span>
                       </td>
                       <td className="px-5 py-3.5 text-center">
                         <span className="inline-block bg-purple-950/60 border border-purple-900 text-purple-300 font-bold font-mono text-xs px-2.5 py-0.5 rounded-full">
-                          {mat.thickness} mm
+                          {mat.spessore} mm
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-center font-mono text-xs text-gray-300">
                         {lengthInMm > 0 || widthInMm > 0 ? `${lengthInMm} x ${widthInMm} mm` : '-'}
                       </td>
                       <td className="px-5 py-3.5 text-center font-mono text-xs text-gray-400">
-                        {mat.length || mat.width ? `${mat.length || 0} x ${mat.width || 0} cm` : '-'}
+                        {mat.lunghezza || mat.larghezza ? `${mat.lunghezza || 0} x ${mat.larghezza || 0} cm` : '-'}
                       </td>
                       <td className="px-5 py-3.5">
                         <span className="text-gray-300 text-xs font-medium">
-                          {mat.supplier || <span className="text-gray-600 font-normal italic">-</span>}
+                          {mat.fornitore || <span className="text-gray-600 font-normal italic">-</span>}
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-right font-mono text-xs text-emerald-400 font-semibold">
-                        {mat.cost !== undefined ? `€ ${mat.cost.toFixed(2)}` : '-'}
+                        {mat.prezzoLastra !== undefined ? `€ ${mat.prezzoLastra.toFixed(2)}` : '-'}
                       </td>
                       <td className="px-5 py-3.5 text-center">
-                        {mat.link ? (
+                        {mat.linkSchedaTecnica ? (
                           <a
-                            href={ensureAbsoluteUrl(mat.link)}
+                            href={ensureAbsoluteUrl(mat.linkSchedaTecnica)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center justify-center p-1.5 bg-blue-950/40 border border-blue-900/60 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-900/40 transition-colors"
@@ -529,7 +529,7 @@ export default function MaterialManager({ setActiveTab }: Props) {
                             <Edit3 size={14} />
                           </button>
                           <button
-                            onClick={() => handleDelete(mat.id, mat.name)}
+                            onClick={() => handleDelete(mat.id, mat.nome)}
                             className="p-1.5 bg-gray-850 hover:bg-rose-950/40 border border-gray-700 hover:border-rose-900 rounded-lg text-gray-400 hover:text-rose-400 transition-all cursor-pointer"
                             title="Elimina materiale"
                           >

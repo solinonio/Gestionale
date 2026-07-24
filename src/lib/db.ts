@@ -1,4 +1,4 @@
-import { CostItem, Quotation, CompanyInfo, Client, LaserProcessingData, LaserConfigRow, User, UserRole, Invoice, SharedMaterial } from '../types';
+import { CostItem, Quotation, CompanyInfo, Client, LaserProcessingData, LaserConfigRow, User, UserRole, Invoice, Materiale } from '../types';
 import { validateQuotationSchema, verifyDatiGestionaleSchemaConsistency } from './schemaValidator';
 
 // Helper to generate unique IDs
@@ -86,7 +86,7 @@ export const syncWithServer = async (force: boolean = false): Promise<void> => {
 
     if (json.success && json.data) {
       const fileData = json.data;
-      const keys = ['quotations', 'clients', 'catalog_items', 'company_profile', 'laser_processing_data', 'users', 'invoices'] as const;
+      const keys = ['quotations', 'clients', 'catalog_items', 'company_profile', 'laser_processing_data', 'users', 'invoices', 'materiali'] as const;
       const payloadToSave: Record<string, any> = {};
       let needsSaveToServer = false;
       let hasChanges = false;
@@ -494,47 +494,47 @@ export const deleteInvoice = async (invoiceId: string) => {
   window.dispatchEvent(new CustomEvent('database-synced'));
 };
 
-const DEFAULT_SHARED_MATERIALS: SharedMaterial[] = [
-  { id: 'sm1', name: 'Legno Pioppo', thickness: 4, cost: 25, length: 100, width: 100 },
-  { id: 'sm2', name: 'Plexiglass Cast', thickness: 3, cost: 35, length: 100, width: 100 },
-  { id: 'sm3', name: 'Pelle Naturale', thickness: 2, cost: 45, length: 50, width: 50 },
-  { id: 'sm4', name: 'MDF Standard', thickness: 3, cost: 15, length: 100, width: 100 },
-  { id: 'sm5', name: 'Cartone pressato', thickness: 2, cost: 5, length: 100, width: 100 },
-  { id: 'sm6', name: 'Vetro', thickness: 4, cost: 12, length: 60, width: 60 },
-  { id: 'sm7', name: 'Legno Compensato', thickness: 3, cost: 18, length: 100, width: 100 }
+const DEFAULT_MATERIALI: Materiale[] = [
+  { id: 'sm1', nome: 'Legno Pioppo', spessore: 4, prezzoLastra: 25, lunghezza: 100, larghezza: 100 },
+  { id: 'sm2', nome: 'Plexiglass Cast', spessore: 3, prezzoLastra: 35, lunghezza: 100, larghezza: 100 },
+  { id: 'sm3', nome: 'Pelle Naturale', spessore: 2, prezzoLastra: 45, lunghezza: 50, larghezza: 50 },
+  { id: 'sm4', nome: 'MDF Standard', spessore: 3, prezzoLastra: 15, lunghezza: 100, larghezza: 100 },
+  { id: 'sm5', nome: 'Cartone pressato', spessore: 2, prezzoLastra: 5, lunghezza: 100, larghezza: 100 },
+  { id: 'sm6', nome: 'Vetro', spessore: 4, prezzoLastra: 12, lunghezza: 60, larghezza: 60 },
+  { id: 'sm7', nome: 'Legno Compensato', spessore: 3, prezzoLastra: 18, lunghezza: 100, larghezza: 100 }
 ];
 
-export const getSharedMaterials = async (): Promise<SharedMaterial[]> => {
+export const getMateriali = async (): Promise<Materiale[]> => {
   await syncWithServer();
-  return getLocalStorageItem<SharedMaterial[]>('shared_materials', DEFAULT_SHARED_MATERIALS);
+  return getLocalStorageItem<Materiale[]>('materiali', DEFAULT_MATERIALI);
 };
 
-export const addSharedMaterial = async (material: Omit<SharedMaterial, 'id'>): Promise<SharedMaterial> => {
+export const addMateriale = async (material: Omit<Materiale, 'id'>): Promise<Materiale> => {
   await syncWithServer(true);
-  const list = getLocalStorageItem<SharedMaterial[]>('shared_materials', DEFAULT_SHARED_MATERIALS);
+  const list = getLocalStorageItem<Materiale[]>('materiali', DEFAULT_MATERIALI);
   const newMat = { ...material, id: generateId() };
   list.push(newMat);
-  await setLocalStorageItem('shared_materials', list);
+  await setLocalStorageItem('materiali', list);
   window.dispatchEvent(new CustomEvent('database-synced'));
   return newMat;
 };
 
-export const updateSharedMaterial = async (id: string, material: Omit<SharedMaterial, 'id'>): Promise<void> => {
+export const updateMateriale = async (id: string, material: Omit<Materiale, 'id'>): Promise<void> => {
   await syncWithServer(true);
-  const list = getLocalStorageItem<SharedMaterial[]>('shared_materials', DEFAULT_SHARED_MATERIALS);
+  const list = getLocalStorageItem<Materiale[]>('materiali', DEFAULT_MATERIALI);
   const idx = list.findIndex(m => m.id === id);
   if (idx !== -1) {
     list[idx] = { ...material, id };
-    await setLocalStorageItem('shared_materials', list);
+    await setLocalStorageItem('materiali', list);
     window.dispatchEvent(new CustomEvent('database-synced'));
   }
 };
 
-export const deleteSharedMaterial = async (id: string): Promise<void> => {
+export const deleteMateriale = async (id: string): Promise<void> => {
   await syncWithServer(true);
-  const list = getLocalStorageItem<SharedMaterial[]>('shared_materials', DEFAULT_SHARED_MATERIALS);
+  const list = getLocalStorageItem<Materiale[]>('materiali', DEFAULT_MATERIALI);
   const filtered = list.filter(m => m.id !== id);
-  await setLocalStorageItem('shared_materials', filtered);
+  await setLocalStorageItem('materiali', filtered);
   window.dispatchEvent(new CustomEvent('database-synced'));
 };
 

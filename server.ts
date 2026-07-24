@@ -488,6 +488,19 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             \`json_data\` LONGTEXT NOT NULL
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
+        await connection.query(`
+          CREATE TABLE IF NOT EXISTS Materiali (
+            \`id\` VARCHAR(100) PRIMARY KEY,
+            \`nome\` VARCHAR(255) NOT NULL,
+            \`fornitore\` VARCHAR(255),
+            \`prezzoLastra\` DECIMAL(15,2),
+            \`linkSchedaTecnica\` TEXT,
+            \`lunghezza\` DECIMAL(15,2),
+            \`larghezza\` DECIMAL(15,2),
+            \`spessore\` DECIMAL(15,2),
+            \`json_data\` LONGTEXT NOT NULL
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `);
 
         // Automatic migration of legacy quotations from app_store to preventivi table
         try {
@@ -649,6 +662,33 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             data["quotations"] = [];
           }
 
+          // Fetch from dedicated Materiali table
+          try {
+            const [mRows]: any = await pool.query("SELECT `id`, `nome`, `fornitore`, `prezzoLastra`, `linkSchedaTecnica`, `lunghezza`, `larghezza`, `spessore`, `json_data` FROM Materiali");
+            const materiali = [];
+            for (const mRow of mRows) {
+              try {
+                const m = JSON.parse(mRow.json_data);
+                // Allinea le proprietà del JSON con i valori delle singole colonne del DB
+                if (mRow.id) m.id = mRow.id;
+                if (mRow.nome) m.nome = mRow.nome;
+                if (mRow.fornitore !== undefined) m.fornitore = mRow.fornitore;
+                if (mRow.prezzoLastra !== undefined) m.prezzoLastra = parseFloat(mRow.prezzoLastra);
+                if (mRow.linkSchedaTecnica !== undefined) m.linkSchedaTecnica = mRow.linkSchedaTecnica;
+                if (mRow.lunghezza !== undefined) m.lunghezza = parseFloat(mRow.lunghezza);
+                if (mRow.larghezza !== undefined) m.larghezza = parseFloat(mRow.larghezza);
+                if (mRow.spessore !== undefined) m.spessore = parseFloat(mRow.spessore);
+                materiali.push(m);
+              } catch (e) {
+                console.error("[MariaDB] Errore nel parsing del materiale:", e);
+              }
+            }
+            data["materiali"] = materiali;
+          } catch (mErr: any) {
+            console.error("[MariaDB] Errore nel caricamento dei materiali dalla tabella Materiali:", mErr.message);
+            // Non sovrascrivere se non riusciamo a caricare, così rimane quello in app_store o default
+          }
+
           return res.json({ success: true, dbType: "mariadb", data });
         } catch (err: any) {
           console.warn("[MariaDB] Impossibile connettersi o interrogare MariaDB, ricado su JSON locale:", err.message);
@@ -728,6 +768,50 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
                   [
                     q.id, numero, anno, dataPrev, cliente, totale, stringified,
                     numero, anno, dataPrev, cliente, totale, stringified
+                  ]
+                );
+              }
+            } else if (key === "materiali" && Array.isArray(val)) {
+              // 1. Get all incoming material IDs
+              const incomingIds = val.map((m: any) => m.id).filter(Boolean);
+
+              // 2. Delete materials that are no longer in the list
+              if (incomingIds.length > 0) {
+                await pool.query(
+                  "DELETE FROM Materiali WHERE id NOT IN (?)",
+                  [incomingIds]
+                );
+              } else {
+                await pool.query("DELETE FROM Materiali");
+              }
+
+              // 3. Upsert each incoming material in its own row
+              for (const m of val) {
+                if (!m.id) continue;
+                const stringified = JSON.stringify(m);
+                const nome = m.nome || "";
+                const fornitore = m.fornitore || "";
+                const prezzo = parseFloat(m.prezzoLastra) || 0.0;
+                const link = m.linkSchedaTecnica || "";
+                const lunghezza = parseFloat(m.lunghezza) || 0.0;
+                const larghezza = parseFloat(m.larghezza) || 0.0;
+                const spessore = parseFloat(m.spessore) || 0.0;
+
+                await pool.query(
+                  `INSERT INTO Materiali (\`id\`, \`nome\`, \`fornitore\`, \`prezzoLastra\`, \`linkSchedaTecnica\`, \`lunghezza\`, \`larghezza\`, \`spessore\`, \`json_data\`) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) 
+                   ON DUPLICATE KEY UPDATE 
+                     \`nome\` = ?, 
+                     \`fornitore\` = ?, 
+                     \`prezzoLastra\` = ?, 
+                     \`linkSchedaTecnica\` = ?, 
+                     \`lunghezza\` = ?, 
+                     \`larghezza\` = ?, 
+                     \`spessore\` = ?, 
+                     \`json_data\` = ?`,
+                  [
+                    m.id, nome, fornitore, prezzo, link, lunghezza, larghezza, spessore, stringified,
+                    nome, fornitore, prezzo, link, lunghezza, larghezza, spessore, stringified
                   ]
                 );
               }

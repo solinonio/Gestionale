@@ -213,15 +213,15 @@ export interface User {
   createdAt?: string;
 }
 
-export interface SharedMaterial {
+export interface Materiale {
   id: string;
-  name: string;
-  thickness: number;
-  cost?: number;
-  length?: number;
-  width?: number;
-  link?: string;
-  supplier?: string;
+  nome: string;
+  fornitore?: string;
+  prezzoLastra?: number;
+  linkSchedaTecnica?: string;
+  lunghezza?: number;
+  larghezza?: number;
+  spessore: number;
 }
 
 

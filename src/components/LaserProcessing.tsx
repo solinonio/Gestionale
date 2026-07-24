@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getLaserProcessingData, saveLaserProcessingData, getClients, getSharedMaterials, addSharedMaterial } from '../lib/db';
-import { LaserProcessingData, LaserConfigRow, LaserColorRow, Client, User, SharedMaterial } from '../types';
+import { getLaserProcessingData, saveLaserProcessingData, getClients, getMateriali, addMateriale } from '../lib/db';
+import { LaserProcessingData, LaserConfigRow, LaserColorRow, Client, User, Materiale } from '../types';
 import { Plus, Trash2, Copy, Save, Check, Cpu, Zap, Settings, RefreshCw, Search, Star, User as UserIcon, Wind, Fan, Edit, CircleDashed, Activity } from 'lucide-react';
 
 const LightburnIcon = ({ size = 20, className = "" }: { size?: number; className?: string }) => (
@@ -55,15 +55,15 @@ export default function LaserProcessing({ currentUser }: Props) {
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [sharedMaterials, setSharedMaterials] = useState<SharedMaterial[]>([]);
+  const [sharedMaterials, setSharedMaterials] = useState<Materiale[]>([]);
 
   const loadSharedMaterialsData = async () => {
     try {
-      const mats = await getSharedMaterials();
-      const sorted = [...mats].sort((a, b) => a.name.localeCompare(b.name, 'it', { sensitivity: 'base' }));
+      const mats = await getMateriali();
+      const sorted = [...mats].sort((a, b) => a.nome.localeCompare(b.nome, 'it', { sensitivity: 'base' }));
       setSharedMaterials(sorted);
     } catch (err) {
-      console.error('Failed to load shared materials', err);
+      console.error('Failed to load materials', err);
     }
   };
 
@@ -1090,7 +1090,7 @@ export default function LaserProcessing({ currentUser }: Props) {
 
         return (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-            <div className="bg-white rounded-xl shadow-xl border border-gray-300 max-w-[84rem] w-full overflow-hidden text-gray-900 flex flex-col max-h-[90vh]">
+            <div className="bg-white rounded-xl shadow-xl border border-gray-300 max-w-[92rem] w-full overflow-hidden text-gray-900 flex flex-col max-h-[90vh]">
               {/* Header */}
               <div className="bg-gradient-to-r from-blue-800 to-indigo-950 text-white px-6 py-4 flex items-center justify-between shrink-0">
                 <h3 className="text-lg font-bold flex items-center gap-2">
@@ -1140,8 +1140,8 @@ export default function LaserProcessing({ currentUser }: Props) {
                               if (found) {
                                 setEditingRow({
                                   ...editingRow,
-                                  materiale: found.name,
-                                  spessore: found.thickness
+                                  materiale: found.nome,
+                                  spessore: found.spessore
                                 });
                               }
                             }
@@ -1150,7 +1150,7 @@ export default function LaserProcessing({ currentUser }: Props) {
                           <option value="">-- Scegli un materiale per compilare Nome e Spessore --</option>
                           {sharedMaterials.map(m => (
                             <option key={m.id} value={m.id}>
-                              {m.name} ({m.thickness} mm) {m.cost ? `- €${m.cost.toFixed(2)}` : ''}
+                              {m.nome} ({m.spessore} mm) {m.prezzoLastra ? `- €${m.prezzoLastra.toFixed(2)}` : ''}
                             </option>
                           ))}
                         </select>
@@ -1191,11 +1191,11 @@ export default function LaserProcessing({ currentUser }: Props) {
                           onClick={async () => {
                             if (!editingRow.materiale.trim()) return;
                             try {
-                              await addSharedMaterial({
-                                name: editingRow.materiale,
-                                thickness: editingRow.spessore || 0
+                              await addMateriale({
+                                nome: editingRow.materiale,
+                                spessore: editingRow.spessore || 0
                               });
-                              alert('Materiale salvato e condiviso con successo!');
+                              alert('Materiale salvato nel database Materiali!');
                               loadSharedMaterialsData();
                             } catch (err) {
                               console.error(err);
@@ -1376,34 +1376,29 @@ export default function LaserProcessing({ currentUser }: Props) {
                         </div>
                       </div>
 
-                      {/* Grid for MODALITA, DPI, PPI */}
+                      {/* Grid for MODALITA, DPI, PPI - Converted to static info in the modal as requested */}
                       <div className="grid grid-cols-3 gap-4">
-                        {/* MODALITA dropdown */}
+                        {/* MODALITA text input */}
                         <div className="space-y-1 col-span-1">
                           <label className="block text-xs font-bold text-gray-700 uppercase">Modalità</label>
-                          <select
+                          <input
+                            type="text"
                             value={editingRow.modalita || ''}
                             onChange={(e) => setEditingRow({ ...editingRow, modalita: e.target.value })}
+                            placeholder="Es. BLACK&WHITE"
                             className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-950 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
-                          >
-                            <option value="">Seleziona</option>
-                            <option value="BLACK&WHITE">BLACK&WHITE</option>
-                            <option value="MANUAL COLOR">MANUAL COLOR</option>
-                            <option value="3D MODE">3D MODE</option>
-                            <option value="STAMP MODE">STAMP MODE</option>
-                          </select>
+                          />
                         </div>
-                        {/* DPI dropdown */}
+                        {/* DPI text input */}
                         <div className="space-y-1 col-span-1">
                           <label className="block text-xs font-bold text-gray-700 uppercase">DPI</label>
-                          <select
+                          <input
+                            type="text"
                             value={editingRow.dpi || ''}
                             onChange={(e) => setEditingRow({ ...editingRow, dpi: e.target.value })}
+                            placeholder="Es. 300"
                             className="w-full bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-950 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
-                          >
-                            <option value="">Seleziona</option>
-                            {[125, 250, 300, 380, 500, 600, 760, 1000].map(d => <option key={d} value={d}>{d}</option>)}
-                          </select>
+                          />
                         </div>
                         {/* PPI numeric input */}
                         <div className="space-y-1 col-span-1">
@@ -1461,18 +1456,18 @@ export default function LaserProcessing({ currentUser }: Props) {
                                     colorRows: [...currentColorRows, newRow]
                                   });
                                 } else {
-                                  // Update ALL existing rows of this color with current main parameters
+                                  // Update ALL existing rows of this color with current main parameters - FORCED OVERWRITE
                                   const updatedRows = currentColorRows.map(row => {
                                     if (row.colorRgb === c.color) {
                                       return {
                                         ...row,
-                                        velocita: editingRow.velocita || row.velocita,
-                                        potenza: editingRow.potenza || row.potenza,
-                                        passaggi: editingRow.passaggi || row.passaggi,
-                                        frequenza: editingRow.frequenza || row.frequenza,
-                                        modalita: editingRow.modalita || row.modalita,
-                                        dpi: editingRow.dpi || row.dpi,
-                                        ppi: editingRow.ppi || row.ppi
+                                        velocita: editingRow.velocita || '',
+                                        potenza: editingRow.potenza || '',
+                                        passaggi: editingRow.passaggi || '',
+                                        frequenza: editingRow.frequenza || '',
+                                        modalita: editingRow.modalita || '',
+                                        dpi: editingRow.dpi || '',
+                                        ppi: editingRow.ppi || ''
                                       };
                                     }
                                     return row;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Calculator, Sliders, Euro, Percent, TrendingUp, TrendingDown, Search, Paintbrush } from 'lucide-react';
-import { getSharedMaterials, addSharedMaterial } from '../lib/db';
-import { SharedMaterial, InternalRow } from '../types';
+import { getMateriali, addMateriale } from '../lib/db';
+import { Materiale, InternalRow } from '../types';
 
 interface Props {
   onAddInternalRow?: (description: string, cost: number) => void;
@@ -17,17 +17,17 @@ export default function Simulator({ onAddInternalRow, sellingPriceDefault = 0, s
   const [simSheetWidth, setSimSheetWidth] = useState(100);
   const [simSheetThickness, setSimSheetThickness] = useState(5);
 
-  const [sharedMaterials, setSharedMaterials] = useState<SharedMaterial[]>([]);
+  const [sharedMaterials, setSharedMaterials] = useState<Materiale[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
 
   const loadMaterials = async () => {
     try {
-      const mats = await getSharedMaterials();
-      const sorted = [...mats].sort((a, b) => a.name.localeCompare(b.name, 'it', { sensitivity: 'base' }));
+      const mats = await getMateriali();
+      const sorted = [...mats].sort((a, b) => a.nome.localeCompare(b.nome, 'it', { sensitivity: 'base' }));
       setSharedMaterials(sorted);
     } catch (err) {
-      console.error('Failed to load shared materials', err);
+      console.error('Failed to load materials', err);
     }
   };
 
@@ -45,22 +45,23 @@ export default function Simulator({ onAddInternalRow, sellingPriceDefault = 0, s
   const handleSaveMaterialToShared = async () => {
     if (!simMaterialName.trim()) return;
     try {
-      await addSharedMaterial({
-        name: simMaterialName,
-        thickness: simSheetThickness,
-        cost: simSheetCost,
-        length: simSheetLength,
-        width: simSheetWidth
+      await addMateriale({
+        nome: simMaterialName,
+        spessore: simSheetThickness,
+        prezzoLastra: simSheetCost,
+        lunghezza: simSheetLength,
+        larghezza: simSheetWidth
       });
-      alert('Materiale salvato con successo nei materiali condivisi!');
+      alert('Materiale salvato con successo nel database Materiali!');
       setSearchQuery('');
+      loadMaterials();
     } catch (err) {
       console.error('Errore nel salvare il materiale', err);
     }
   };
 
   const filteredSharedMaterials = sharedMaterials.filter(mat =>
-    mat.name.toLowerCase().includes(searchQuery.toLowerCase())
+    mat.nome.toLowerCase().includes(searchQuery.toLowerCase())
   );
   
   const [simProcLength, setSimProcLength] = useState(50);
@@ -204,23 +205,23 @@ export default function Simulator({ onAddInternalRow, sellingPriceDefault = 0, s
                           key={mat.id}
                           type="button"
                           onClick={() => {
-                            setSimMaterialName(mat.name);
-                            setSimSheetThickness(mat.thickness);
-                            if (mat.cost !== undefined) setSimSheetCost(mat.cost);
-                            if (mat.length !== undefined) setSimSheetLength(mat.length);
-                            if (mat.width !== undefined) setSimSheetWidth(mat.width);
-                            setSearchQuery(mat.name);
+                            setSimMaterialName(mat.nome);
+                            setSimSheetThickness(mat.spessore);
+                            if (mat.prezzoLastra !== undefined) setSimSheetCost(mat.prezzoLastra);
+                            if (mat.lunghezza !== undefined) setSimSheetLength(mat.lunghezza);
+                            if (mat.larghezza !== undefined) setSimSheetWidth(mat.larghezza);
+                            setSearchQuery(mat.nome);
                             setShowDropdown(false);
                           }}
                           className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 text-gray-800 flex justify-between items-center cursor-pointer"
                         >
                           <div>
-                            <span className="font-semibold text-blue-900">{mat.name}</span>
-                            <span className="ml-2 text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{mat.thickness}mm</span>
+                            <span className="font-semibold text-blue-900">{mat.nome}</span>
+                            <span className="ml-2 text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{mat.spessore}mm</span>
                           </div>
-                          {mat.cost !== undefined && (
+                          {mat.prezzoLastra !== undefined && (
                             <span className="font-mono text-[10px] text-gray-600">
-                              {mat.length}x{mat.width}cm - €{mat.cost.toFixed(2)}
+                              {mat.lunghezza}x{mat.larghezza}cm - €{mat.prezzoLastra.toFixed(2)}
                             </span>
                           )}
                         </button>
