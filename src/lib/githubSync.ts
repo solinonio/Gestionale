@@ -283,7 +283,7 @@ export const pullFromGitHub = async (
   }
 };
 
-export const CURRENT_VERSION = "3.6.2";
+export const CURRENT_VERSION = "3.6.3";
 
 export const isVersionOlder = (local: string, remote: string): boolean => {
   const localParts = local.replace(/^v/i, '').split('.').map(Number);

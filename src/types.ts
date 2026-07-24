@@ -158,6 +158,7 @@ export interface InternalRow {
 export interface LaserConfigRow {
   id: string;
   materiale: string;
+  nomeLavorazione?: string;
   potenza: string;
   velocita: string;
   passaggi: string;

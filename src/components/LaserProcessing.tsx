@@ -821,6 +821,11 @@ export default function LaserProcessing({ currentUser }: Props) {
                               </span>
                             )}
                           </button>
+                          {row.nomeLavorazione && (
+                            <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md italic ml-1">
+                              {row.nomeLavorazione}
+                            </span>
+                          )}
                           {row.materiale.trim() && row.materiale !== 'Nuovo Materiale' && (
                             <button
                               onClick={() => handleSaveAsPreset(row)}
@@ -1165,6 +1170,18 @@ export default function LaserProcessing({ currentUser }: Props) {
                             value={editingRow.materiale}
                             onChange={(e) => setEditingRow({ ...editingRow, materiale: e.target.value })}
                             placeholder="Es. Legno Pioppo"
+                            className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-950 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                          />
+                        </div>
+
+                        {/* Nome Lavorazione */}
+                        <div className="col-span-8 space-y-1">
+                          <label className="block text-xs font-bold text-gray-700 uppercase">Nome Lavorazione</label>
+                          <input
+                            type="text"
+                            value={editingRow.nomeLavorazione || ''}
+                            onChange={(e) => setEditingRow({ ...editingRow, nomeLavorazione: e.target.value })}
+                            placeholder="Es. Taglio Portachiavi"
                             className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-950 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
                           />
                         </div>

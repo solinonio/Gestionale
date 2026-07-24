@@ -11,6 +11,22 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.6.3",
+    date: "2026-07-24",
+    title: "Gestionale v3.6.3 - Gestione Nomi Lavorazione",
+    type: "patch",
+    changes: [
+      {
+        category: "feature",
+        text: "Scheda Lavorazione: Aggiunto il campo 'Nome Lavorazione' per identificare specificamente ogni operazione laser."
+      },
+      {
+        category: "improvement",
+        text: "Persistenza: Il nome della lavorazione viene ora salvato correttamente insieme ai parametri del materiale e ricaricato all'apertura della scheda."
+      }
+    ]
+  },
+  {
     version: "3.6.2",
     date: "2026-07-24",
     title: "Gestionale v3.6.2 - Sincronizzazione Materiali Forzata",
