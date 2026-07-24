@@ -155,11 +155,12 @@ export const getCatalogItems = async (): Promise<CostItem[]> => {
 };
 
 export const addCatalogItem = async (item: Omit<CostItem, 'id'>) => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const items = getLocalStorageItem<CostItem[]>('catalog_items', []);
   const newItem = { ...item, id: generateId() };
   items.push(newItem);
   await setLocalStorageItem('catalog_items', items);
+  await syncWithServer(true); // Push immediately
   return { id: newItem.id };
 };
 
@@ -190,18 +191,17 @@ export const saveQuotation = async (quotation: Omit<Quotation, 'id'>) => {
   const validationErrors = validateQuotationSchema(quotation);
   if (validationErrors.length > 0) {
     console.error("Schema Consistency Warning for new quotation:", validationErrors);
-    // We can throw or warn, let's warn and continue to avoid hard-blocking unless critical,
-    // but the prompt says "ensure they conform... and won't fail". Let's alert the developer.
   }
 
-  // Sync before save to ensure we have the latest state
-  await syncWithServer(true); 
+  // Sync before to ensure we have latest list
+  await syncWithServer(); 
   const quotations = getLocalStorageItem<Quotation[]>('quotations', []);
   const newQuotation = { ...quotation, id: generateId() };
   quotations.push(newQuotation);
   
-  // setLocalStorageItem includes the server POST
+  // Save locally and push to server
   await setLocalStorageItem('quotations', quotations);
+  await syncWithServer(true); // Force push
   
   window.dispatchEvent(new CustomEvent('database-synced'));
   console.log("saveQuotation successful:", newQuotation.id);
@@ -217,28 +217,28 @@ export const updateQuotation = async (quotationId: string, quotation: Omit<Quota
     console.error(`Schema Consistency Warning for quotation update (${quotationId}):`, validationErrors);
   }
 
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const quotations = getLocalStorageItem<Quotation[]>('quotations', []);
   const index = quotations.findIndex(q => q.id === quotationId);
   if (index !== -1) {
     quotations[index] = { ...quotation, id: quotationId };
     await setLocalStorageItem('quotations', quotations);
-    console.log("updateQuotation successful (update):", quotationId);
   } else {
     console.warn(`Quotation with ID ${quotationId} not found for update. Creating new one.`);
     const newQuotation = { ...quotation, id: quotationId };
     quotations.push(newQuotation);
     await setLocalStorageItem('quotations', quotations);
-    console.log("updateQuotation successful (create):", quotationId);
   }
+  await syncWithServer(true); // Push changes
   window.dispatchEvent(new CustomEvent('database-synced'));
 };
 
 export const deleteQuotation = async (quotationId: string) => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const quotations = getLocalStorageItem<Quotation[]>('quotations', []);
   const filtered = quotations.filter(q => q.id !== quotationId);
   await setLocalStorageItem('quotations', filtered);
+  await syncWithServer(true); // Push deletion
   window.dispatchEvent(new CustomEvent('database-synced'));
 };
 
@@ -269,17 +269,18 @@ export const getClients = async (): Promise<Client[]> => {
 
 export const addClient = async (client: Omit<Client, 'id'>) => {
   if (!client.name) throw new Error('Client name is required');
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const clients = getLocalStorageItem<Client[]>('clients', []);
   const newClient = { ...client, id: generateId() };
   clients.push(newClient);
   await setLocalStorageItem('clients', clients);
+  await syncWithServer(true); // Push immediately
   return { id: newClient.id };
 };
 
 export const updateClient = async (clientId: string, client: Omit<Client, 'id'>) => {
   if (!client.name) throw new Error('Client name is required');
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const clients = getLocalStorageItem<Client[]>('clients', []);
   const index = clients.findIndex(c => c.id === clientId);
   if (index !== -1) {
@@ -291,6 +292,7 @@ export const updateClient = async (clientId: string, client: Omit<Client, 'id'>)
     clients.push(newClient);
     await setLocalStorageItem('clients', clients);
   }
+  await syncWithServer(true); // Push changes
 };
 
 // Default Laser Processing data (initial state)
@@ -341,10 +343,11 @@ export const saveLaserProcessingData = async (data: LaserProcessingData): Promis
 };
 
 export const deleteClient = async (clientId: string): Promise<void> => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const clients = getLocalStorageItem<Client[]>('clients', []);
   const filtered = clients.filter(c => c.id !== clientId);
   await setLocalStorageItem('clients', filtered);
+  await syncWithServer(true); // Push deletion
 };
 
 // User Management Helpers
@@ -354,29 +357,32 @@ export const getUsers = async (): Promise<User[]> => {
 };
 
 export const addUser = async (user: Omit<User, 'id'>) => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const users = getLocalStorageItem<User[]>('users', []);
   const newUser = { ...user, id: generateId(), createdAt: new Date().toISOString() };
   users.push(newUser);
   await setLocalStorageItem('users', users);
+  await syncWithServer(true); // Push immediately
   return { id: newUser.id };
 };
 
 export const updateUser = async (userId: string, user: Omit<User, 'id' | 'createdAt'>) => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const users = getLocalStorageItem<User[]>('users', []);
   const index = users.findIndex(u => u.id === userId);
   if (index !== -1) {
     users[index] = { ...users[index], ...user };
     await setLocalStorageItem('users', users);
+    await syncWithServer(true); // Push changes
   }
 };
 
 export const deleteUser = async (userId: string) => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const users = getLocalStorageItem<User[]>('users', []);
   const filtered = users.filter(u => u.id !== userId);
   await setLocalStorageItem('users', filtered);
+  await syncWithServer(true); // Push deletion
 };
 
 export const initializeDefaultUsers = async (): Promise<void> => {
@@ -442,21 +448,21 @@ export const getInvoices = async (): Promise<Invoice[]> => {
 };
 
 export const saveInvoice = async (invoice: Omit<Invoice, 'id'>) => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const invoices = getLocalStorageItem<Invoice[]>('invoices', []);
   const newInvoice = { ...invoice, id: generateId() };
   invoices.push(newInvoice);
   await setLocalStorageItem('invoices', invoices);
+  await syncWithServer(true); // Push immediately
   window.dispatchEvent(new CustomEvent('database-synced'));
   return { id: newInvoice.id };
 };
 
 export const saveInvoicesBulk = async (newInvoices: Omit<Invoice, 'id'>[]) => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const invoices = getLocalStorageItem<Invoice[]>('invoices', []);
   const added: Invoice[] = [];
   for (const inv of newInvoices) {
-    // Prevent importing duplicates based on XML filename
     if (invoices.some(existing => existing.xmlFilename === inv.xmlFilename)) {
       continue;
     }
@@ -466,13 +472,14 @@ export const saveInvoicesBulk = async (newInvoices: Omit<Invoice, 'id'>[]) => {
   }
   if (added.length > 0) {
     await setLocalStorageItem('invoices', invoices);
+    await syncWithServer(true); // Push bulk
     window.dispatchEvent(new CustomEvent('database-synced'));
   }
   return added;
 };
 
 export const updateInvoice = async (invoiceId: string, invoice: Omit<Invoice, 'id'>) => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const invoices = getLocalStorageItem<Invoice[]>('invoices', []);
   const index = invoices.findIndex(i => i.id === invoiceId);
   if (index !== -1) {
@@ -483,14 +490,16 @@ export const updateInvoice = async (invoiceId: string, invoice: Omit<Invoice, 'i
     invoices.push(newInvoice);
     await setLocalStorageItem('invoices', invoices);
   }
+  await syncWithServer(true); // Push changes
   window.dispatchEvent(new CustomEvent('database-synced'));
 };
 
 export const deleteInvoice = async (invoiceId: string) => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const invoices = getLocalStorageItem<Invoice[]>('invoices', []);
   const filtered = invoices.filter(i => i.id !== invoiceId);
   await setLocalStorageItem('invoices', filtered);
+  await syncWithServer(true); // Push deletion
   window.dispatchEvent(new CustomEvent('database-synced'));
 };
 
@@ -510,31 +519,34 @@ export const getMateriali = async (): Promise<Materiale[]> => {
 };
 
 export const addMateriale = async (material: Omit<Materiale, 'id'>): Promise<Materiale> => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest from server before adding
   const list = getLocalStorageItem<Materiale[]>('materiali', DEFAULT_MATERIALI);
   const newMat = { ...material, id: generateId() };
   list.push(newMat);
   await setLocalStorageItem('materiali', list);
+  await syncWithServer(true); // Force immediate push to server
   window.dispatchEvent(new CustomEvent('database-synced'));
   return newMat;
 };
 
 export const updateMateriale = async (id: string, material: Omit<Materiale, 'id'>): Promise<void> => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest
   const list = getLocalStorageItem<Materiale[]>('materiali', DEFAULT_MATERIALI);
   const idx = list.findIndex(m => m.id === id);
   if (idx !== -1) {
     list[idx] = { ...material, id };
     await setLocalStorageItem('materiali', list);
+    await syncWithServer(true); // Push changes
     window.dispatchEvent(new CustomEvent('database-synced'));
   }
 };
 
 export const deleteMateriale = async (id: string): Promise<void> => {
-  await syncWithServer(true);
+  await syncWithServer(); // Get latest from server to ensure we are deleting from current state
   const list = getLocalStorageItem<Materiale[]>('materiali', DEFAULT_MATERIALI);
   const filtered = list.filter(m => m.id !== id);
   await setLocalStorageItem('materiali', filtered);
+  await syncWithServer(true); // Push the deletion to server immediately
   window.dispatchEvent(new CustomEvent('database-synced'));
 };
 

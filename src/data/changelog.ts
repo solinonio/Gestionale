@@ -11,6 +11,22 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.6.1",
+    date: "2026-07-24",
+    title: "Gestionale v3.6.1 - Fix Sincronizzazione Real-time",
+    type: "patch",
+    changes: [
+      {
+        category: "bugfix",
+        text: "Sincronizzazione Multi-PC: Corretta la logica di salvataggio che impediva la propagazione immediata delle eliminazioni e delle modifiche tra diversi dispositivi."
+      },
+      {
+        category: "improvement",
+        text: "Integrità Dati: Implementato il ricaricamento forzato dal server prima di ogni operazione di scrittura per prevenire la sovrascrittura di dati recenti."
+      }
+    ]
+  },
+  {
     version: "3.6.0",
     date: "2026-07-24",
     title: "Gestionale v3.6.0 - Database Materiali MariaDB e UI Laser XL",
