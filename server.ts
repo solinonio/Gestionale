@@ -672,12 +672,12 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
                 // Allinea le proprietà del JSON con i valori delle singole colonne del DB
                 if (mRow.id) m.id = mRow.id;
                 if (mRow.nome) m.nome = mRow.nome;
-                if (mRow.fornitore !== undefined) m.fornitore = mRow.fornitore;
-                if (mRow.prezzoLastra !== undefined) m.prezzoLastra = parseFloat(mRow.prezzoLastra);
-                if (mRow.linkSchedaTecnica !== undefined) m.linkSchedaTecnica = mRow.linkSchedaTecnica;
-                if (mRow.lunghezza !== undefined) m.lunghezza = parseFloat(mRow.lunghezza);
-                if (mRow.larghezza !== undefined) m.larghezza = parseFloat(mRow.larghezza);
-                if (mRow.spessore !== undefined) m.spessore = parseFloat(mRow.spessore);
+                if (mRow.fornitore !== undefined && mRow.fornitore !== null) m.fornitore = mRow.fornitore;
+                if (mRow.prezzoLastra !== undefined && mRow.prezzoLastra !== null) m.prezzoLastra = parseFloat(mRow.prezzoLastra);
+                if (mRow.linkSchedaTecnica !== undefined && mRow.linkSchedaTecnica !== null) m.linkSchedaTecnica = mRow.linkSchedaTecnica;
+                if (mRow.lunghezza !== undefined && mRow.lunghezza !== null) m.lunghezza = parseFloat(mRow.lunghezza);
+                if (mRow.larghezza !== undefined && mRow.larghezza !== null) m.larghezza = parseFloat(mRow.larghezza);
+                if (mRow.spessore !== undefined && mRow.spessore !== null) m.spessore = parseFloat(mRow.spessore);
                 materiali.push(m);
               } catch (e) {
                 console.error("[MariaDB] Errore nel parsing del materiale:", e);

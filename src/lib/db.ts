@@ -514,7 +514,7 @@ const DEFAULT_MATERIALI: Materiale[] = [
 ];
 
 export const getMateriali = async (): Promise<Materiale[]> => {
-  await syncWithServer();
+  await syncWithServer(true); // Force sync to ensure we get latest data from MariaDB
   return getLocalStorageItem<Materiale[]>('materiali', DEFAULT_MATERIALI);
 };
 

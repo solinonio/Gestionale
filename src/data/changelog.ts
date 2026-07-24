@@ -11,6 +11,22 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.6.2",
+    date: "2026-07-24",
+    title: "Gestionale v3.6.2 - Sincronizzazione Materiali Forzata",
+    type: "patch",
+    changes: [
+      {
+        category: "improvement",
+        text: "Sincronizzazione Materiali: Implementato il caricamento forzato dal server ogni volta che si accede alla pagina Materiali, garantendo la coerenza dei dati tra più postazioni MariaDB."
+      },
+      {
+        category: "bugfix",
+        text: "Database MariaDB: Perfezionata la gestione dei valori nulli nel recupero dati per prevenire inconsistenze visive."
+      }
+    ]
+  },
+  {
     version: "3.6.1",
     date: "2026-07-24",
     title: "Gestionale v3.6.1 - Fix Sincronizzazione Real-time",
