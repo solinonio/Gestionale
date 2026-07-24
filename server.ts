@@ -470,8 +470,8 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             id INT AUTO_INCREMENT PRIMARY KEY,
             cliente_id VARCHAR(100) NOT NULL,
             nome_file VARCHAR(255) NOT NULL,
-            nome_originale VARCHAR(255) NOT NULL,
-            percorso_file VARCHAR(255) NOT NULL,
+            nome_originale TEXT NOT NULL,
+            percorso_file TEXT NOT NULL,
             dimensione INT NOT NULL,
             data_caricamento DATETIME DEFAULT CURRENT_TIMESTAMP
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -481,8 +481,8 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             id INT AUTO_INCREMENT PRIMARY KEY,
             preventivo_id VARCHAR(100) NOT NULL,
             nome_file VARCHAR(255) NOT NULL,
-            nome_originale VARCHAR(255) NOT NULL,
-            percorso_file VARCHAR(255) NOT NULL,
+            nome_originale TEXT NOT NULL,
+            percorso_file TEXT NOT NULL,
             dimensione INT NOT NULL,
             data_caricamento DATETIME DEFAULT CURRENT_TIMESTAMP
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -1431,6 +1431,54 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     } catch (err: any) {
       console.error("Errore upload:", err);
       res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/attachments/link", async (req, res) => {
+    try {
+        const { path: filePath, type, id } = req.body;
+        if (!filePath || !type || !id) {
+            return res.status(400).json({ success: false, error: "Dati mancanti" });
+        }
+
+        const config = getDbConfig();
+        const fileName = path.basename(filePath);
+        
+        if (config.dbType === 'mariadb') {
+            const pool = await getMariaPool(config);
+            const table = type === 'client' ? 'allegati_clienti' : 'allegati_preventivi';
+            const idField = type === 'client' ? 'cliente_id' : 'preventivo_id';
+            
+            // Usiamo 'link://' come prefisso per identificare che è un percorso esterno
+            await pool.query(
+                `INSERT INTO ${table} (${idField}, nome_file, nome_originale, percorso_file, dimensione) VALUES (?, ?, ?, ?, ?)`,
+                [id, 'manual_link', filePath, filePath, 0]
+            );
+        } else {
+            // Supporto SQLite per sviluppo locale
+            const attachmentsPath = path.join(path.dirname(getDbPath()), 'attachments_meta.json');
+            let meta = {};
+            if (fs.existsSync(attachmentsPath)) {
+                meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
+            }
+            const attachmentId = Date.now().toString();
+            meta[attachmentId] = {
+                id: attachmentId,
+                type,
+                id: id,
+                nome_originale: filePath,
+                percorso_file: filePath,
+                nome_file: 'manual_link',
+                dimensione: 0,
+                data_caricamento: new Date().toISOString()
+            };
+            fs.writeFileSync(attachmentsPath, JSON.stringify(meta, null, 2));
+        }
+
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error("Errore salvataggio link:", err);
+        res.status(500).json({ success: false, error: err.message });
     }
   });
 

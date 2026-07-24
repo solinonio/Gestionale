@@ -10,13 +10,15 @@ import {
   File, 
   Eye, 
   X,
-  Plus
+  Link,
+  ExternalLink
 } from 'lucide-react';
-import { getAttachments, uploadAttachment, downloadAttachment, deleteAttachment } from '../lib/db';
+import { getAttachments, uploadAttachment, downloadAttachment, deleteAttachment, addAttachmentLink } from '../lib/db';
 
 interface Attachment {
   id: string;
   nome_originale: string;
+  nome_file: string;
   dimensione: number;
   data_caricamento: string;
   mimetype?: string;
@@ -38,7 +40,8 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showPathInput, setShowPathInput] = useState(false);
+  const [manualPath, setManualPath] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -56,6 +59,27 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
     } catch (err: any) {
       console.error("Errore caricamento allegati:", err);
       setError("Impossibile caricare gli allegati");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddManualPath = async () => {
+    if (!manualPath.trim()) return;
+    
+    if (id === 'new') {
+      alert("Salva l'elemento prima di poter aggiungere allegati.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await addAttachmentLink(manualPath.trim(), type, id);
+      setManualPath('');
+      setShowPathInput(false);
+      await loadAttachments();
+    } catch (err: any) {
+      setError(err.message || "Errore durante l'aggiunta del percorso");
     } finally {
       setLoading(false);
     }
@@ -107,7 +131,9 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
-  const getFileIcon = (filename: string) => {
+  const getFileIcon = (att: Attachment) => {
+    if (att.nome_file === 'manual_link') return <Link size={18} className="text-orange-500" />;
+    const filename = att.nome_originale;
     const ext = filename.split('.').pop()?.toLowerCase();
     if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) return <ImageIcon size={18} className="text-blue-500" />;
     if (ext === 'pdf') return <FileText size={18} className="text-red-500" />;
@@ -133,6 +159,13 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
         <div className="flex items-center gap-2">
            {uploading && <Loader2 size={14} className="animate-spin text-blue-600" />}
            <button 
+             onClick={() => setShowPathInput(!showPathInput)}
+             className="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-[10px] font-bold transition-colors"
+           >
+             <Link size={12} />
+             INSERISCI PERCORSO
+           </button>
+           <button 
              onClick={() => fileInputRef.current?.click()}
              disabled={uploading}
              className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold transition-colors disabled:opacity-50"
@@ -150,6 +183,29 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
         </div>
       </div>
 
+      {showPathInput && (
+        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md space-y-2">
+          <p className="text-[10px] font-bold text-blue-800">Inserisci il percorso completo del file (NAS o Locale):</p>
+          <div className="flex gap-2">
+            <input 
+              type="text"
+              value={manualPath}
+              onChange={(e) => setManualPath(e.target.value)}
+              placeholder="Esempio: \\NAS\Documenti\File.pdf oppure C:\Lavori\Disegno.jpg"
+              className="flex-1 px-2 py-1.5 text-[11px] border border-blue-200 rounded outline-none focus:border-blue-500"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddManualPath()}
+            />
+            <button 
+              onClick={handleAddManualPath}
+              className="px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded hover:bg-blue-700"
+            >
+              AGGIUNGI
+            </button>
+          </div>
+          <p className="text-[9px] text-blue-600 italic">Incolla qui il percorso esatto del file per salvarlo nel database.</p>
+        </div>
+      )}
+
       {error && (
         <div className="p-2 bg-red-50 border border-red-100 text-red-600 text-[10px] rounded flex justify-between items-center">
           <span>{error}</span>
@@ -166,26 +222,43 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
           {attachments.map((att) => (
             <div key={att.id} className="flex items-center gap-3 p-2 bg-white border border-gray-200 rounded-md hover:border-blue-300 transition-all group">
               <div className="p-1.5 bg-gray-50 rounded border border-gray-100">
-                {getFileIcon(att.nome_originale)}
+                {getFileIcon(att)}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] font-bold text-gray-900 truncate" title={att.nome_originale}>
                   {att.nome_originale}
                 </p>
                 <div className="flex items-center gap-2 text-[9px] text-gray-500 font-medium">
-                  <span>{formatSize(att.dimensione)}</span>
+                  {att.nome_file === 'manual_link' ? (
+                    <span className="text-orange-600">Percorso NAS/Locale</span>
+                  ) : (
+                    <span>{formatSize(att.dimensione)}</span>
+                  )}
                   <span>•</span>
                   <span>{new Date(att.data_caricamento).toLocaleDateString()}</span>
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <button 
-                  onClick={() => downloadAttachment(att.id)}
-                  className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                  title="Scarica"
-                >
-                  <Download size={14} />
-                </button>
+                {att.nome_file === 'manual_link' ? (
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(att.nome_originale);
+                      alert("Percorso copiato negli appunti!");
+                    }}
+                    className="p-1 text-orange-600 hover:bg-orange-50 rounded"
+                    title="Copia Percorso"
+                  >
+                    <ExternalLink size={14} />
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => downloadAttachment(att.id)}
+                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                    title="Scarica"
+                  >
+                    <Download size={14} />
+                  </button>
+                )}
                 <button 
                   onClick={() => handleDelete(att.id)}
                   className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"

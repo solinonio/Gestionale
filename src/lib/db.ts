@@ -414,6 +414,19 @@ export const uploadAttachment = async (file: File, type: 'client' | 'quotation',
     return response.json();
 };
 
+export const addAttachmentLink = async (path: string, type: 'client' | 'quotation', id: string) => {
+  const response = await fetch('/api/attachments/link', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, type, id })
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Errore durante il salvataggio del link');
+  }
+  return response.json();
+};
+
 export const getAttachments = async (type: 'client' | 'quotation', id: string) => {
     const response = await fetch(`/api/attachments/${type}/${id}`);
     if (!response.ok) {
