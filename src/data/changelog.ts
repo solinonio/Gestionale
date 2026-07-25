@@ -11,6 +11,22 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.7.1",
+    date: "2026-07-25",
+    title: "Gestionale v3.7.1 - Ottimizzazione Database",
+    type: "patch",
+    changes: [
+      {
+        category: "improvement",
+        text: "Migliorata l'inizializzazione forzata delle tabelle MariaDB all'apertura del backup."
+      },
+      {
+        category: "bugfix",
+        text: "Risolto problema di persistenza schema su alcuni ambienti MariaDB."
+      }
+    ]
+  },
+  {
     version: "3.7.0",
     date: "2026-07-25",
     title: "Gestionale v3.7.0 - Transizione MariaDB e Pulizia Sistema",

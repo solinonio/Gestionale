@@ -290,13 +290,13 @@ export default function App() {
                 <button 
                   onClick={() => setIsChangelogOpen(true)}
                   className="relative bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm select-none cursor-pointer transition-all flex items-center gap-1 group"
-                  title="Clicca per vedere le novità della versione 3.7.0"
+                  title="Clicca per vedere le novità della versione 3.7.1"
                 >
                   v{CURRENT_VERSION}
                   <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[8px] px-1 rounded-full animate-bounce">NEW</span>
                 </button>
                 <span className="bg-blue-900/40 text-blue-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-800/50 select-none uppercase tracking-tighter">
-                  REV. 174
+                  REV. 175
                 </span>
                 {remoteSoftwareVersion && (
                   <button

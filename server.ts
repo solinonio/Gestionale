@@ -1683,7 +1683,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
   }
   
   app.listen(PORT, "0.0.0.0", () => {
-    let version = "3.7.0";
+    let version = "3.7.1";
     try {
       const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8"));
       version = pkg.version;
