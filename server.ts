@@ -1115,6 +1115,25 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     }
   });
 
+  app.post("/api/db-force-init", async (req, res) => {
+    console.log("[API] POST /api/db-force-init requested");
+    try {
+      const config = getDbConfig();
+      if (config.dbType !== 'mariadb') {
+        return res.json({ success: false, error: "Database MariaDB non configurato come attivo." });
+      }
+      
+      // La funzione getMariaPool esegue già i CREATE TABLE IF NOT EXISTS
+      await getMariaPool(config);
+      
+      console.log("[API] Inizializzazione tabelle MariaDB completata con successo.");
+      return res.json({ success: true, message: "Tabelle inizializzate correttamente." });
+    } catch (err: any) {
+      console.error("[API] Errore in /api/db-force-init:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   app.post("/api/db-config", async (req, res) => {
     try {
       const { dbType, customPath, mariadbConfig, copyExisting } = req.body;

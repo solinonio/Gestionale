@@ -300,6 +300,17 @@ export default function BackupModal({ isOpen, onClose, onBackupSuccess }: Props)
         });
         setStatusMsg({ type: null, text: '' });
         fetchDbConfig();
+        
+        // Forza l'inizializzazione delle tabelle MariaDB all'apertura del modal
+        fetch('/api/db-force-init', { method: 'POST' })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              console.log("[BackupModal] Database MariaDB inizializzato correttamente all'apertura.");
+            }
+          })
+          .catch(err => console.error("[BackupModal] Errore inizializzazione tabelle:", err));
+
       } catch (e) {
         console.error(e);
       }
