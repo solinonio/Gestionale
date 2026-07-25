@@ -441,6 +441,42 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
               \`totale\` DECIMAL(15,2),
               \`json_data\` LONGTEXT NOT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+          },
+          {
+            name: 'Materiali',
+            sql: `CREATE TABLE IF NOT EXISTS Materiali (
+              \`id\` VARCHAR(100) PRIMARY KEY,
+              \`nome\` VARCHAR(255) NOT NULL,
+              \`fornitore\` VARCHAR(255),
+              \`prezzoLastra\` DECIMAL(15,2),
+              \`linkSchedaTecnica\` TEXT,
+              \`lunghezza\` DECIMAL(15,2),
+              \`larghezza\` DECIMAL(15,2),
+              \`spessore\` DECIMAL(15,2),
+              \`json_data\` LONGTEXT NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+          },
+          {
+            name: 'users',
+            sql: `CREATE TABLE IF NOT EXISTS users (
+              \`id\` VARCHAR(100) PRIMARY KEY,
+              \`username\` VARCHAR(100) UNIQUE NOT NULL,
+              \`password\` VARCHAR(255) NOT NULL,
+              \`role\` VARCHAR(50),
+              \`createdAt\` VARCHAR(50)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+          },
+          {
+            name: 'invoices',
+            sql: `CREATE TABLE IF NOT EXISTS invoices (
+              \`id\` VARCHAR(100) PRIMARY KEY,
+              \`number\` VARCHAR(50),
+              \`date\` VARCHAR(20),
+              \`clientName\` VARCHAR(255),
+              \`totalAmount\` DECIMAL(15,2),
+              \`xmlFilename\` VARCHAR(255),
+              \`json_data\` LONGTEXT NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
           }
         ];
 
@@ -921,81 +957,117 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
       sqlDump += `-- Data: ${new Date().toISOString()}\n\n`;
       sqlDump += `SET FOREIGN_KEY_CHECKS = 0;\n\n`;
 
-      // 1. app_store
-      sqlDump += `-- Tabella: app_store\n`;
-      sqlDump += `DROP TABLE IF EXISTS \`app_store\`;\n`;
-      sqlDump += `CREATE TABLE \`app_store\` (\n`;
-      sqlDump += `  \`key\` VARCHAR(100) PRIMARY KEY,\n`;
-      sqlDump += `  \`value\` LONGTEXT NOT NULL\n`;
-      sqlDump += `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n\n`;
+      const exportTable = async (tableName: string, query: string, createSql: string, mapRow: (row: any) => string) => {
+        try {
+          const [rows]: any = await pool.query(query);
+          sqlDump += `-- Tabella: ${tableName}\n`;
+          sqlDump += `DROP TABLE IF EXISTS \`${tableName}\`;\n`;
+          sqlDump += `${createSql};\n\n`;
+          
+          if (rows.length > 0) {
+            sqlDump += `INSERT INTO \`${tableName}\` VALUES\n`;
+            const values = rows.map(mapRow);
+            sqlDump += values.join(",\n") + ";\n\n";
+          }
+        } catch (err: any) {
+          console.warn(`[Export] Salto tabella ${tableName} perché non esiste o errore:`, err.message);
+        }
+      };
 
-      const [appStoreRows]: any = await pool.query("SELECT * FROM app_store");
-      if (appStoreRows.length > 0) {
-        sqlDump += `INSERT INTO \`app_store\` (\`key\`, \`value\`) VALUES\n`;
-        const values = appStoreRows.map((row: any) => {
-          return `(${escape(row.key)}, ${escape(row.value)})`;
-        });
-        sqlDump += values.join(",\n") + ";\n\n";
-      }
+      // 1. app_store
+      await exportTable(
+        'app_store',
+        "SELECT * FROM app_store",
+        `CREATE TABLE \`app_store\` (
+          \`key\` VARCHAR(100) PRIMARY KEY,
+          \`value\` LONGTEXT NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+        (row) => `(${escape(row.key)}, ${escape(row.value)})`
+      );
 
       // 2. preventivi
-      sqlDump += `-- Tabella: preventivi\n`;
-      sqlDump += `DROP TABLE IF EXISTS \`preventivi\`;\n`;
-      sqlDump += `CREATE TABLE \`preventivi\` (\n`;
-      sqlDump += `  \`id\` VARCHAR(100) PRIMARY KEY,\n`;
-      sqlDump += `  \`numero\` VARCHAR(50),\n`;
-      sqlDump += `  \`anno\` INT,\n`;
-      sqlDump += `  \`data\` VARCHAR(20),\n`;
-      sqlDump += `  \`cliente\` VARCHAR(255),\n`;
-      sqlDump += `  \`totale\` DECIMAL(15,2),\n`;
-      sqlDump += `  \`json_data\` LONGTEXT NOT NULL\n`;
-      sqlDump += `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n\n`;
-
-      const [prevRows]: any = await pool.query("SELECT * FROM preventivi");
-      if (prevRows.length > 0) {
-        sqlDump += `INSERT INTO \`preventivi\` (\`id\`, \`numero\`, \`anno\`, \`data\`, \`cliente\`, \`totale\`, \`json_data\`) VALUES\n`;
-        const values = prevRows.map((row: any) => {
-          return `(${escape(row.id)}, ${escape(row.numero)}, ${row.anno}, ${escape(row.data)}, ${escape(row.cliente)}, ${row.totale}, ${escape(row.json_data)})`;
-        });
-        sqlDump += values.join(",\n") + ";\n\n";
-      }
+      await exportTable(
+        'preventivi',
+        "SELECT * FROM preventivi",
+        `CREATE TABLE \`preventivi\` (
+          \`id\` VARCHAR(100) PRIMARY KEY,
+          \`numero\` VARCHAR(50),
+          \`anno\` INT,
+          \`data\` VARCHAR(20),
+          \`cliente\` VARCHAR(255),
+          \`totale\` DECIMAL(15,2),
+          \`json_data\` LONGTEXT NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+        (row) => `(${escape(row.id)}, ${escape(row.numero)}, ${row.anno}, ${escape(row.data)}, ${escape(row.cliente)}, ${row.totale}, ${escape(row.json_data)})`
+      );
 
       // 3. Materiali
-      sqlDump += `-- Tabella: Materiali\n`;
-      const [matRows]: any = await pool.query("SELECT * FROM Materiali");
-      if (matRows.length > 0) {
-        sqlDump += `INSERT INTO \`Materiali\` (\`id\`, \`nome\`, \`fornitore\`, \`prezzoLastra\`, \`linkSchedaTecnica\`, \`lunghezza\`, \`larghezza\`, \`spessore\`, \`json_data\`) VALUES\n`;
-        const values = matRows.map((row: any) => {
-          return `(${escape(row.id)}, ${escape(row.nome)}, ${escape(row.fornitore)}, ${row.prezzoLastra}, ${escape(row.linkSchedaTecnica)}, ${row.lunghezza}, ${row.larghezza}, ${row.spessore}, ${escape(row.json_data)})`;
-        });
-        sqlDump += values.join(",\n") + ";\n\n";
-      }
+      await exportTable(
+        'Materiali',
+        "SELECT * FROM Materiali",
+        `CREATE TABLE \`Materiali\` (
+          \`id\` VARCHAR(100) PRIMARY KEY,
+          \`nome\` VARCHAR(255) NOT NULL,
+          \`fornitore\` VARCHAR(255),
+          \`prezzoLastra\` DECIMAL(15,2),
+          \`linkSchedaTecnica\` TEXT,
+          \`lunghezza\` DECIMAL(15,2),
+          \`larghezza\` DECIMAL(15,2),
+          \`spessore\` DECIMAL(15,2),
+          \`json_data\` LONGTEXT NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+        (row) => `(${escape(row.id)}, ${escape(row.nome)}, ${escape(row.fornitore)}, ${row.prezzoLastra}, ${escape(row.linkSchedaTecnica)}, ${row.lunghezza}, ${row.larghezza}, ${row.spessore}, ${escape(row.json_data)})`
+      );
 
       // 4. Anagrafiche_Clienti
-      sqlDump += `-- Tabella: Anagrafiche_Clienti\n`;
-      sqlDump += `DROP TABLE IF EXISTS \`Anagrafiche_Clienti\`;\n`;
-      sqlDump += `CREATE TABLE \`Anagrafiche_Clienti\` (\n`;
-      sqlDump += `  \`id\` VARCHAR(100) PRIMARY KEY,\n`;
-      sqlDump += `  \`name\` VARCHAR(255) NOT NULL,\n`;
-      sqlDump += `  \`intestazione\` VARCHAR(255),\n`;
-      sqlDump += `  \`email\` VARCHAR(255),\n`;
-      sqlDump += `  \`phone\` VARCHAR(100),\n`;
-      sqlDump += `  \`address\` TEXT,\n`;
-      sqlDump += `  \`cap\` VARCHAR(20),\n`;
-      sqlDump += `  \`city\` VARCHAR(100),\n`;
-      sqlDump += `  \`vatNumber\` VARCHAR(100),\n`;
-      sqlDump += `  \`sdiCode\` VARCHAR(50),\n`;
-      sqlDump += `  \`json_data\` LONGTEXT NOT NULL\n`;
-      sqlDump += `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n\n`;
+      await exportTable(
+        'Anagrafiche_Clienti',
+        "SELECT * FROM Anagrafiche_Clienti",
+        `CREATE TABLE \`Anagrafiche_Clienti\` (
+          \`id\` VARCHAR(100) PRIMARY KEY,
+          \`name\` VARCHAR(255) NOT NULL,
+          \`intestazione\` VARCHAR(255),
+          \`email\` VARCHAR(255),
+          \`phone\` VARCHAR(100),
+          \`address\` TEXT,
+          \`cap\` VARCHAR(20),
+          \`city\` VARCHAR(100),
+          \`vatNumber\` VARCHAR(100),
+          \`sdiCode\` VARCHAR(50),
+          \`json_data\` LONGTEXT NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+        (row) => `(${escape(row.id)}, ${escape(row.name)}, ${escape(row.intestazione)}, ${escape(row.email)}, ${escape(row.phone)}, ${escape(row.address)}, ${escape(row.cap)}, ${escape(row.city)}, ${escape(row.vatNumber)}, ${escape(row.sdiCode)}, ${escape(row.json_data)})`
+      );
 
-      const [clientRows]: any = await pool.query("SELECT * FROM Anagrafiche_Clienti");
-      if (clientRows.length > 0) {
-        sqlDump += `INSERT INTO \`Anagrafiche_Clienti\` (\`id\`, \`name\`, \`intestazione\`, \`email\`, \`phone\`, \`address\`, \`cap\`, \`city\`, \`vatNumber\`, \`sdiCode\`, \`json_data\`) VALUES\n`;
-        const values = clientRows.map((row: any) => {
-          return `(${escape(row.id)}, ${escape(row.name)}, ${escape(row.intestazione)}, ${escape(row.email)}, ${escape(row.phone)}, ${escape(row.address)}, ${escape(row.cap)}, ${escape(row.city)}, ${escape(row.vatNumber)}, ${escape(row.sdiCode)}, ${escape(row.json_data)})`;
-        });
-        sqlDump += values.join(",\n") + ";\n\n";
-      }
+      // 5. users
+      await exportTable(
+        'users',
+        "SELECT * FROM users",
+        `CREATE TABLE \`users\` (
+          \`id\` VARCHAR(100) PRIMARY KEY,
+          \`username\` VARCHAR(100) UNIQUE NOT NULL,
+          \`password\` VARCHAR(255) NOT NULL,
+          \`role\` VARCHAR(50),
+          \`createdAt\` VARCHAR(50)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+        (row) => `(${escape(row.id)}, ${escape(row.username)}, ${escape(row.password)}, ${escape(row.role)}, ${escape(row.createdAt)})`
+      );
+
+      // 6. invoices
+      await exportTable(
+        'invoices',
+        "SELECT * FROM invoices",
+        `CREATE TABLE \`invoices\` (
+          \`id\` VARCHAR(100) PRIMARY KEY,
+          \`number\` VARCHAR(50),
+          \`date\` VARCHAR(20),
+          \`clientName\` VARCHAR(255),
+          \`totalAmount\` DECIMAL(15,2),
+          \`xmlFilename\` VARCHAR(255),
+          \`json_data\` LONGTEXT NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+        (row) => `(${escape(row.id)}, ${escape(row.number)}, ${escape(row.date)}, ${escape(row.clientName)}, ${row.totalAmount}, ${escape(row.xmlFilename)}, ${escape(row.json_data)})`
+      );
 
       sqlDump += `SET FOREIGN_KEY_CHECKS = 1;\n`;
 
