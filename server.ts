@@ -1220,8 +1220,8 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
       console.log("[API] Inizializzazione tabelle MariaDB completata.");
       return res.json({ success: true, message: "Tabelle inizializzate correttamente." });
     } catch (err: any) {
-      console.error("[API] Errore in /api/db-force-init:", err);
-      return res.status(500).json({ success: false, error: err.message });
+      console.warn("[API] Avviso in /api/db-force-init (MariaDB non raggiungibile):", err.message || err);
+      return res.json({ success: false, error: err.message || "Impossibile connettersi a MariaDB" });
     }
   });
 

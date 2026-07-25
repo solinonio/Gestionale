@@ -229,8 +229,8 @@ export default function BackupModal({ isOpen, onClose, onBackupSuccess }: Props)
           }
         }
       }
-    } catch (e) {
-      console.error("Errore nel recupero della configurazione database:", e);
+    } catch (e: any) {
+      console.warn("Avviso nel recupero della configurazione database:", e?.message || e);
     }
   };
 
@@ -346,7 +346,7 @@ export default function BackupModal({ isOpen, onClose, onBackupSuccess }: Props)
               console.log("[BackupModal] Database MariaDB inizializzato correttamente all'apertura.");
             }
           })
-          .catch(err => console.error("[BackupModal] Errore inizializzazione tabelle:", err));
+          .catch(err => console.warn("[BackupModal] Avviso inizializzazione tabelle:", err));
 
       } catch (e) {
         console.error(e);
