@@ -16,7 +16,8 @@ import {
   FolderOpen,
   Folder,
   CornerLeftUp,
-  Home
+  Home,
+  Users
 } from 'lucide-react';
 import { 
   exportLocalData, 
@@ -75,11 +76,47 @@ export default function BackupModal({ isOpen, onClose, onBackupSuccess }: Props)
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseError, setBrowseError] = useState<string | null>(null);
   const [isReloading, setIsReloading] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
   const [diagnosticResult, setDiagnosticResult] = useState<{
     run: boolean;
     isValid: boolean;
     errors: string[];
   } | null>(null);
+
+  const handleMigrateClients = async () => {
+    if (!window.confirm("Questa operazione cercherà le anagrafiche dei clienti memorizzate nel vecchio formato (app_store) e le copierà nella nuova tabella (Anagrafiche_Clienti).\n\nProcedere?")) {
+      return;
+    }
+
+    try {
+      setIsMigrating(true);
+      setStatusMsg({ type: 'info', text: "Migrazione anagrafiche in corso..." });
+      
+      const response = await fetch('/api/migrate-clients', { method: 'POST' });
+      const result = await response.json();
+      
+      if (result.success) {
+        setStatusMsg({ 
+          type: 'success', 
+          text: `Migrazione completata con successo! ${result.count} anagrafiche migrate.` 
+        });
+        // Sincronizziamo i dati locali
+        await initializeLocalDatabase();
+        const updatedLocalData = exportLocalData();
+        setStats({
+          quotationsCount: updatedLocalData.quotations?.length || 0,
+          clientsCount: updatedLocalData.clients?.length || 0
+        });
+        if (onBackupSuccess) onBackupSuccess();
+      } else {
+        throw new Error(result.error || "Errore durante la migrazione");
+      }
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: `Errore migrazione: ${err.message}` });
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   const handleReloadDatabase = async () => {
     setIsReloading(true);
@@ -607,6 +644,24 @@ export default function BackupModal({ isOpen, onClose, onBackupSuccess }: Props)
                 <span className="text-[10px] text-gray-400">Forza allineamento con MariaDB</span>
               </div>
             </button>
+
+            {/* Migrazione Clienti (Solo MariaDB) */}
+            {dbType === 'mariadb' && (
+              <button
+                type="button"
+                onClick={handleMigrateClients}
+                disabled={isMigrating}
+                className="flex flex-col items-center justify-center p-5 bg-gray-950/50 hover:bg-gray-850 border border-gray-800 hover:border-gray-700 rounded-xl transition-all text-center space-y-3 group disabled:opacity-50"
+              >
+                <div className={`p-3 bg-amber-950/40 border border-amber-900/60 rounded-xl text-amber-400 group-hover:scale-110 transition-transform ${isMigrating ? 'animate-bounce' : ''}`}>
+                  <Users size={22} />
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-white">Migra Clienti</span>
+                  <span className="text-[10px] text-gray-400">Da app_store a tabella</span>
+                </div>
+              </button>
+            )}
           </div>
 
           {/* Database di Rete / NAS / MariaDB */}

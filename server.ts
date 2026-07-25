@@ -1153,6 +1153,70 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     }
   });
 
+  app.post("/api/migrate-clients", async (req, res) => {
+    console.log("[API] POST /api/migrate-clients requested");
+    try {
+      const config = getDbConfig();
+      if (config.dbType !== 'mariadb') {
+        return res.status(400).json({ success: false, error: "MariaDB non attivo." });
+      }
+      const pool = await getMariaPool(config);
+      const connection = await pool.getConnection();
+      
+      let migratedCount = 0;
+      
+      try {
+        // 1. Prova il formato array sotto la chiave 'clients'
+        const [legacyArray]: any = await connection.query("SELECT `value` FROM app_store WHERE `key` = 'clients'");
+        if (legacyArray.length > 0) {
+          const clients = JSON.parse(legacyArray[0].value);
+          if (Array.isArray(clients)) {
+            for (const c of clients) {
+              if (!c.id) continue;
+              await connection.query(
+                `INSERT INTO Anagrafiche_Clienti 
+                 (\`id\`, \`name\`, \`intestazione\`, \`email\`, \`phone\`, \`address\`, \`cap\`, \`city\`, \`vatNumber\`, \`sdiCode\`, \`json_data\`) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE 
+                 \`name\` = VALUES(\`name\`), \`json_data\` = VALUES(\`json_data\`)`,
+                [c.id, c.name || "", c.intestazione || "", c.email || "", c.phone || "", c.address || "", c.cap || "", c.city || "", c.vatNumber || "", c.sdiCode || "", JSON.stringify(c)]
+              );
+              migratedCount++;
+            }
+          }
+        }
+
+        // 2. Prova il formato individuale 'client:%'
+        const [legacyIndividual]: any = await connection.query("SELECT `value` FROM app_store WHERE `key` LIKE 'client:%'");
+        for (const row of legacyIndividual) {
+          try {
+            const c = JSON.parse(row.value);
+            if (!c.id) continue;
+            await connection.query(
+              `INSERT INTO Anagrafiche_Clienti 
+               (\`id\`, \`name\`, \`intestazione\`, \`email\`, \`phone\`, \`address\`, \`cap\`, \`city\`, \`vatNumber\`, \`sdiCode\`, \`json_data\`) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON DUPLICATE KEY UPDATE 
+               \`name\` = VALUES(\`name\`), \`json_data\` = VALUES(\`json_data\`)`,
+              [c.id, c.name || "", c.intestazione || "", c.email || "", c.phone || "", c.address || "", c.cap || "", c.city || "", c.vatNumber || "", c.sdiCode || "", JSON.stringify(c)]
+            );
+            migratedCount++;
+          } catch (e) {
+            console.warn("[API] Errore parsing record individuale client:", row.key);
+          }
+        }
+
+        console.log(`[API] Migrazione completata: ${migratedCount} record processati.`);
+        res.json({ success: true, count: migratedCount });
+      } finally {
+        connection.release();
+      }
+    } catch (err: any) {
+      console.error("[API] Errore migrazione:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   app.post("/api/db-config", async (req, res) => {
     try {
       const { dbType, customPath, mariadbConfig, copyExisting } = req.body;
