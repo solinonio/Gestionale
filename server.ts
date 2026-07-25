@@ -749,7 +749,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
         }
       }
 
-      if (config.dbType === "json" || useJsonFallback) {
+      if (config.dbType !== "mariadb" || useJsonFallback) {
         const activePath = getDbPath();
         ensureDbFile(activePath);
         const content = fs.readFileSync(activePath, "utf-8");
@@ -765,6 +765,10 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
           fallbackReason: useJsonFallback ? fallbackReason : undefined,
           data: data
         });
+      }
+
+      if (!res.headersSent) {
+        return res.json({ success: true, dbType: config.dbType || "json", data: {} });
       }
     } catch (err: any) {
       console.error("Errore nel caricamento del database:", err);
@@ -782,6 +786,9 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
       if (config.dbType === "mariadb") {
         try {
           const pool = await getMariaPool(config);
+          if (!pool) {
+            throw new Error("Pool MariaDB non pronto o non raggiungibile.");
+          }
           for (const [key, val] of Object.entries(newData)) {
             if (key === "quotations" && Array.isArray(val)) {
               // 1. Get all incoming quotation IDs
@@ -908,7 +915,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
         }
       }
 
-      if (config.dbType === "json" || useJsonFallback) {
+      if (config.dbType !== "mariadb" || useJsonFallback) {
         const activePath = getDbPath();
         ensureDbFile(activePath);
         
@@ -928,6 +935,10 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
           dbType: useJsonFallback ? "mariadb-fallback" : "json",
           fallbackReason: useJsonFallback ? fallbackReason : undefined
         });
+      }
+
+      if (!res.headersSent) {
+        return res.json({ success: true, dbType: config.dbType || "json" });
       }
     } catch (err: any) {
       console.error("Errore nel salvataggio del database locale:", err);

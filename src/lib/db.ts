@@ -62,11 +62,10 @@ const setLocalStorageItem = async <T,>(key: string, value: T): Promise<void> => 
       body: JSON.stringify({ [key]: value })
     });
     if (!response.ok) {
-      throw new Error(`Failed to save ${key} to server: ${response.statusText}`);
+      console.warn(`Server responded with status ${response.status} when saving ${key}`);
     }
   } catch (e) {
-    console.error(`Error writing ${key} to localStorage or server`, e);
-    throw e; // Rethrow to let caller handle it
+    console.warn(`Server non raggiungibile per il salvataggio remoto di ${key} (dati conservati in memoria/localStorage):`, e);
   }
 };
 
