@@ -8,6 +8,9 @@ const generateId = (): string => {
     : Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
 };
 
+// In-memory cache store to guarantee complete data retention even if browser localStorage exceeds quota
+const inMemoryStore: Record<string, any> = {};
+
 export const safeGetItem = (key: string): string | null => {
   try {
     return localStorage.getItem(key);
@@ -25,11 +28,19 @@ export const safeSetItem = (key: string, value: string): void => {
   }
 };
 
-// Helper for local storage access with type safety
+// Helper for local storage access with type safety and in-memory fallback
 const getLocalStorageItem = <T,>(key: string, defaultValue: T): T => {
+  if (inMemoryStore[key] !== undefined && inMemoryStore[key] !== null) {
+    return inMemoryStore[key] as T;
+  }
   try {
     const value = safeGetItem(key);
-    return value ? JSON.parse(value) : defaultValue;
+    if (value) {
+      const parsed = JSON.parse(value);
+      inMemoryStore[key] = parsed;
+      return parsed;
+    }
+    return defaultValue;
   } catch (e) {
     console.error(`Error reading ${key} from localStorage`, e);
     return defaultValue;
@@ -37,8 +48,13 @@ const getLocalStorageItem = <T,>(key: string, defaultValue: T): T => {
 };
 
 const setLocalStorageItem = async <T,>(key: string, value: T): Promise<void> => {
+  inMemoryStore[key] = value;
   try {
     safeSetItem(key, JSON.stringify(value));
+  } catch (e) {
+    console.warn(`Could not persist ${key} to localStorage, kept in memory and saving to server file:`, e);
+  }
+  try {
     // Mirror to server's local file database
     const response = await fetch('/api/local-db', {
       method: 'POST',
@@ -46,7 +62,7 @@ const setLocalStorageItem = async <T,>(key: string, value: T): Promise<void> => 
       body: JSON.stringify({ [key]: value })
     });
     if (!response.ok) {
-        throw new Error(`Failed to save ${key} to server: ${response.statusText}`);
+      throw new Error(`Failed to save ${key} to server: ${response.statusText}`);
     }
   } catch (e) {
     console.error(`Error writing ${key} to localStorage or server`, e);
@@ -93,19 +109,28 @@ export const syncWithServer = async (force: boolean = false): Promise<void> => {
 
       for (const key of keys) {
         const fileVal = fileData[key];
-        const localValStr = safeGetItem(key);
         
         if (fileVal !== undefined) {
+          const currentValStr = JSON.stringify(inMemoryStore[key]);
           const fileValStr = JSON.stringify(fileVal);
-          if (localValStr !== fileValStr) {
-            safeSetItem(key, fileValStr);
+          if (currentValStr !== fileValStr) {
+            inMemoryStore[key] = fileVal;
             hasChanges = true;
           }
-        } else if (localValStr !== null) {
-          try {
-            payloadToSave[key] = JSON.parse(localValStr);
-            needsSaveToServer = true;
-          } catch (e) {}
+          safeSetItem(key, fileValStr);
+        } else if (inMemoryStore[key] !== undefined) {
+          payloadToSave[key] = inMemoryStore[key];
+          needsSaveToServer = true;
+        } else {
+          const localValStr = safeGetItem(key);
+          if (localValStr !== null) {
+            try {
+              const parsed = JSON.parse(localValStr);
+              inMemoryStore[key] = parsed;
+              payloadToSave[key] = parsed;
+              needsSaveToServer = true;
+            } catch (e) {}
+          }
         }
       }
 

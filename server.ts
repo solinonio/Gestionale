@@ -500,36 +500,31 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
 
         // Automatic migration of legacy clients from app_store to Anagrafiche_Clienti
         try {
-          const [clientCountRows]: any = await connection.query("SELECT COUNT(*) as cnt FROM Anagrafiche_Clienti");
-          if (clientCountRows[0].cnt === 0) {
-            const [legacyRows]: any = await connection.query("SELECT `value` FROM app_store WHERE `key` = 'clients'");
-            if (legacyRows.length > 0) {
-              console.log("[MariaDB] Rilevate anagrafiche pregressi in app_store, avvio migrazione...");
-              const legacyClients = JSON.parse(legacyRows[0].value);
-              if (Array.isArray(legacyClients)) {
-                for (const c of legacyClients) {
-                  if (!c.id) continue;
-                  const stringified = JSON.stringify(c);
-                  await connection.query(
-                    `INSERT INTO Anagrafiche_Clienti 
-                     (\`id\`, \`name\`, \`intestazione\`, \`email\`, \`phone\`, \`address\`, \`cap\`, \`city\`, \`vatNumber\`, \`sdiCode\`, \`json_data\`) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [
-                      c.id, 
-                      c.name || "", 
-                      c.intestazione || "", 
-                      c.email || "", 
-                      c.phone || "", 
-                      c.address || "", 
-                      c.cap || "", 
-                      c.city || "", 
-                      c.vatNumber || "", 
-                      c.sdiCode || "", 
-                      stringified
-                    ]
-                  );
-                }
-                console.log(`[MariaDB] Migrazione anagrafiche completata: ${legacyClients.length} record trasferiti.`);
+          const [legacyRows]: any = await connection.query("SELECT `value` FROM app_store WHERE `key` = 'clients'");
+          if (legacyRows.length > 0 && legacyRows[0].value) {
+            const legacyClients = JSON.parse(legacyRows[0].value);
+            if (Array.isArray(legacyClients) && legacyClients.length > 0) {
+              for (const c of legacyClients) {
+                if (!c.id) continue;
+                const stringified = JSON.stringify(c);
+                await connection.query(
+                  `INSERT IGNORE INTO Anagrafiche_Clienti 
+                   (\`id\`, \`name\`, \`intestazione\`, \`email\`, \`phone\`, \`address\`, \`cap\`, \`city\`, \`vatNumber\`, \`sdiCode\`, \`json_data\`) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  [
+                    c.id, 
+                    c.name || "", 
+                    c.intestazione || "", 
+                    c.email || "", 
+                    c.phone || "", 
+                    c.address || "", 
+                    c.cap || "", 
+                    c.city || "", 
+                    c.vatNumber || "", 
+                    c.sdiCode || "", 
+                    stringified
+                  ]
+                );
               }
             }
           }
@@ -539,29 +534,24 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
 
         // Automatic migration of legacy quotations from app_store to preventivi table
         try {
-          const [prevCountRows]: any = await connection.query("SELECT COUNT(*) as cnt FROM preventivi");
-          if (prevCountRows[0].cnt === 0) {
-            const [legacyRows]: any = await connection.query("SELECT `value` FROM app_store WHERE `key` = 'quotations'");
-            if (legacyRows.length > 0) {
-              console.log("[MariaDB] Rilevati preventivi pregressi in app_store, avvio migrazione automatica...");
-              const legacyQuotations = JSON.parse(legacyRows[0].value);
-              if (Array.isArray(legacyQuotations)) {
-                for (const q of legacyQuotations) {
-                  if (!q.id) continue;
-                  const stringified = JSON.stringify(q);
-                  const numero = q.number || "";
-                  const anno = parseInt(q.year) || new Date().getFullYear();
-                  const dataPrev = q.date || "";
-                  const cliente = q.clientInfo?.name || "";
-                  const totale = parseFloat(q.totalAmount) || 0.0;
+          const [legacyRows]: any = await connection.query("SELECT `value` FROM app_store WHERE `key` = 'quotations'");
+          if (legacyRows.length > 0 && legacyRows[0].value) {
+            const legacyQuotations = JSON.parse(legacyRows[0].value);
+            if (Array.isArray(legacyQuotations) && legacyQuotations.length > 0) {
+              for (const q of legacyQuotations) {
+                if (!q.id) continue;
+                const stringified = JSON.stringify(q);
+                const numero = q.number || "";
+                const anno = parseInt(q.year) || new Date().getFullYear();
+                const dataPrev = q.date || "";
+                const cliente = q.clientInfo?.name || "";
+                const totale = parseFloat(q.totalAmount) || 0.0;
 
-                  await connection.query(
-                    `INSERT INTO preventivi (\`id\`, \`numero\`, \`anno\`, \`data\`, \`cliente\`, \`totale\`, \`json_data\`) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    [q.id, numero, anno, dataPrev, cliente, totale, stringified]
-                  );
-                }
-                console.log(`[MariaDB] Migrazione completata con successo: ${legacyQuotations.length} preventivi trasferiti.`);
+                await connection.query(
+                  `INSERT IGNORE INTO preventivi (\`id\`, \`numero\`, \`anno\`, \`data\`, \`cliente\`, \`totale\`, \`json_data\`) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                  [q.id, numero, anno, dataPrev, cliente, totale, stringified]
+                );
               }
             }
           }
