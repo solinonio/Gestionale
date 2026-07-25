@@ -1543,6 +1543,52 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     }
   });
 
+  // API per visualizzare un file locale/NAS (funziona se il server ha accesso al percorso)
+  app.get("/api/attachments/preview/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const config = getDbConfig();
+      let attachment: any = null;
+
+      if (config.dbType === 'mariadb') {
+        const pool = await getMariaPool(config);
+        const [rows]: any = await pool.query(
+          "SELECT percorso_file, nome_originale, nome_file FROM allegati_clienti WHERE id = ? UNION SELECT percorso_file, nome_originale, nome_file FROM allegati_preventivi WHERE id = ?", 
+          [id, id]
+        );
+        if (rows.length > 0) attachment = rows[0];
+      } else {
+        const attachmentsPath = path.join(path.dirname(getDbPath()), 'attachments_meta.json');
+        if (fs.existsSync(attachmentsPath)) {
+          const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
+          attachment = meta[id];
+        }
+      }
+
+      if (!attachment) return res.status(404).send("Allegato non trovato");
+
+      const filePath = attachment.nome_originale; // Il percorso completo o link NAS
+      const relativePath = attachment.percorso_file;
+
+      // Se è un file caricato fisicamente sul server
+      const absolutePath = path.isAbsolute(relativePath) ? relativePath : path.join(UPLOAD_ROOT, relativePath);
+      
+      if (fs.existsSync(absolutePath)) {
+        return res.sendFile(absolutePath);
+      } 
+      
+      // Se è un percorso NAS/Locale che il server può raggiungere direttamente
+      if (fs.existsSync(filePath)) {
+        return res.sendFile(filePath);
+      }
+
+      res.status(404).send(`File non trovato. Il server non può raggiungere: ${filePath}`);
+    } catch (error) {
+      console.error("Errore anteprima:", error);
+      res.status(500).send("Errore durante l'apertura del file");
+    }
+  });
+
   app.get("/api/attachments/:type/:id", async (req, res) => {
     try {
         const { type, id } = req.params;
@@ -1896,44 +1942,6 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
 
   // Rende la cartella 'uploads' accessibile pubblicamente via browser
   app.use("/uploads", express.static(UPLOAD_ROOT));
-
-  // API per visualizzare un file locale/NAS (funziona se il server ha accesso al percorso)
-  app.get("/api/attachments/preview/:id", (req, res) => {
-    try {
-      const { id } = req.params;
-      const config = getDbConfig();
-      let attachment: any = null;
-
-      if (config.dbType === 'mariadb') {
-        // Logica per MariaDB (semplificata)
-      } else {
-        const attachmentsPath = path.join(process.cwd(), "attachments_meta.json");
-        if (fs.existsSync(attachmentsPath)) {
-          const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
-          attachment = meta[id];
-        }
-      }
-
-      if (!attachment) return res.status(404).send("Allegato non trovato");
-
-      const filePath = attachment.nome_originale; // Il percorso completo salvato (es: \\NAS\...)
-
-      if (fs.existsSync(filePath)) {
-        res.sendFile(filePath);
-      } else {
-        // Proviamo a vedere se è un percorso relativo agli upload del server
-        const absolutePath = path.resolve(UPLOAD_ROOT, attachment.percorso_file || '');
-        if (fs.existsSync(absolutePath)) {
-          res.sendFile(absolutePath);
-        } else {
-          res.status(404).send(`File non trovato. Il server non può raggiungere: ${filePath}`);
-        }
-      }
-    } catch (error) {
-      console.error("Errore anteprima:", error);
-      res.status(500).send("Errore durante l'apertura del file");
-    }
-  });
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createServer({
