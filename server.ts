@@ -1422,7 +1422,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
         insertedId = result.insertId;
       } else {
         // Fallback for JSON
-        const attachmentsPath = path.join(path.dirname(getDbPath()), 'attachments_meta.json');
+        const attachmentsPath = getAttachmentsMetaPath();
         let meta: any = {};
         if (fs.existsSync(attachmentsPath)) meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
         insertedId = crypto.randomUUID();
@@ -1446,6 +1446,9 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     }
   });
 
+  // Helper for metadata path
+  const getAttachmentsMetaPath = () => path.join(process.cwd(), 'data', 'attachments_meta.json');
+
   app.post("/api/attachments/link", async (req, res) => {
     try {
         const { path: filePath, type, id } = req.body;
@@ -1453,27 +1456,29 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             return res.status(400).json({ success: false, error: "Dati mancanti" });
         }
 
+        console.log(`Linking file: ${filePath} to ${type} ${id}`);
         const config = getDbConfig();
-        const fileName = path.basename(filePath);
         
         if (config.dbType === 'mariadb') {
             const pool = await getMariaPool(config);
             const table = type === 'client' ? 'allegati_clienti' : 'allegati_preventivi';
             const idField = type === 'client' ? 'cliente_id' : 'preventivo_id';
             
-            // Usiamo 'link://' come prefisso per identificare che è un percorso esterno
             await pool.query(
                 `INSERT INTO ${table} (${idField}, nome_file, nome_originale, percorso_file, dimensione) VALUES (?, ?, ?, ?, ?)`,
                 [id, 'manual_link', filePath, filePath, 0]
             );
         } else {
-            // Supporto SQLite per sviluppo locale
-            const attachmentsPath = path.join(path.dirname(getDbPath()), 'attachments_meta.json');
+            const attachmentsPath = getAttachmentsMetaPath();
+            if (!fs.existsSync(path.dirname(attachmentsPath))) {
+              fs.mkdirSync(path.dirname(attachmentsPath), { recursive: true });
+            }
+            
             let meta = {};
             if (fs.existsSync(attachmentsPath)) {
                 meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
             }
-            const attachmentId = Date.now().toString();
+            const attachmentId = crypto.randomUUID();
             meta[attachmentId] = {
                 id: attachmentId,
                 type,
@@ -1485,6 +1490,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
                 data_caricamento: new Date().toISOString()
             };
             fs.writeFileSync(attachmentsPath, JSON.stringify(meta, null, 2));
+            console.log("Metadata saved to:", attachmentsPath);
         }
 
         res.json({ success: true });
@@ -1494,45 +1500,68 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     }
   });
 
-  // API per l'anteprima specifica (DEVE STARE PRIMA DELLE ALTRE ROTTE GENERICHE)
+  // API per l'anteprima specifica
   app.get("/api/attachment-preview/:id", async (req, res) => {
+    const { id } = req.params;
+    console.log(">>> PREVIEW REQUEST ID:", id);
     try {
-      const { id } = req.params;
       const config = getDbConfig();
       let attachment: any = null;
 
       if (config.dbType === 'mariadb') {
         const pool = await getMariaPool(config);
         const [rows]: any = await pool.query(
-          "SELECT percorso_file, nome_originale, nome_file FROM allegati_clienti WHERE id = ? UNION SELECT percorso_file, nome_originale, nome_file FROM allegati_preventivi WHERE id = ?", 
+          "SELECT id, percorso_file, nome_originale, nome_file FROM allegati_clienti WHERE id = ? UNION SELECT id, percorso_file, nome_originale, nome_file FROM allegati_preventivi WHERE id = ?", 
           [id, id]
         );
         if (rows.length > 0) attachment = rows[0];
       } else {
-        const attachmentsPath = path.join(path.dirname(getDbPath()), 'attachments_meta.json');
+        const attachmentsPath = getAttachmentsMetaPath();
+        console.log("Checking meta at:", attachmentsPath);
         if (fs.existsSync(attachmentsPath)) {
           const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
           attachment = meta[id];
         }
       }
 
-      if (!attachment) return res.status(404).send("Allegato non trovato nel database");
+      if (!attachment) {
+        console.log("Attachment NOT FOUND for ID:", id);
+        return res.status(404).send(`Allegato con ID ${id} non trovato nel database.`);
+      }
 
-      const filePath = attachment.nome_originale; // Il percorso completo (es: \\NAS\...)
-      const relativePath = attachment.percorso_file;
+      const originalPath = attachment.nome_originale || attachment.percorso_file;
+      const relativePath = attachment.percorso_file || '';
 
-      // 1. Prova come file caricato fisicamente sul server (nella cartella uploads)
+      console.log("Attachment found. Original Path:", originalPath, "Relative Path:", relativePath);
+
+      // 1. Prova come file caricato fisicamente sul server (uploads)
       const absolutePath = path.isAbsolute(relativePath) ? relativePath : path.join(UPLOAD_ROOT, relativePath);
       if (fs.existsSync(absolutePath) && !fs.lstatSync(absolutePath).isDirectory()) {
+        console.log("Serving local file:", absolutePath);
         return res.sendFile(absolutePath);
       } 
       
-      // 2. Prova come percorso NAS/Locale diretto (se il server può raggiungerlo)
-      if (fs.existsSync(filePath) && !fs.lstatSync(filePath).isDirectory()) {
-        return res.sendFile(filePath);
+      // 2. Prova come percorso NAS/Locale diretto
+      if (fs.existsSync(originalPath) && !fs.lstatSync(originalPath).isDirectory()) {
+        console.log("Serving NAS/Local file:", originalPath);
+        return res.sendFile(originalPath);
       }
 
-      res.status(404).send(`File non trovato fisicamente sul server.<br><br>Percorso cercato: ${filePath}<br><br>Se il file è su un NAS, assicurati che il server abbia i permessi di accesso.`);
+      console.log("FILE NOT FOUND ON DISK");
+      res.status(404).send(`
+        <html>
+          <body style="font-family: sans-serif; padding: 40px; line-height: 1.6;">
+            <h2 style="color: #e53e3e;">File non trovato fisicamente</h2>
+            <p>Il database ha il collegamento, ma il file non è presente sul server o il server non ha i permessi per accedervi.</p>
+            <div style="background: #f7fafc; padding: 15px; border-radius: 8px; border: 1px solid #edf2f7; font-family: monospace;">
+              <strong>Percorso cercato:</strong> ${originalPath}
+            </div>
+            <p style="margin-top: 20px; font-size: 0.9em; color: #718096;">
+              Se il file si trova su un NAS o su un disco locale dell'utente, il server web non potrà mai visualizzarlo a meno che non sia montato come unità di rete accessibile all'utente che esegue il servizio Node.js.
+            </p>
+          </body>
+        </html>
+      `);
     } catch (error) {
       console.error("Errore anteprima:", error);
       res.status(500).send("Errore durante l'apertura del file");
@@ -1559,7 +1588,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             originalName = rows[0].nome_originale;
             isManualLink = rows[0].nome_file === 'manual_link';
         } else {
-            const attachmentsPath = path.join(path.dirname(getDbPath()), 'attachments_meta.json');
+            const attachmentsPath = getAttachmentsMetaPath();
             const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
             const entry = meta[id];
             if (!entry) return res.status(404).json({ success: false, error: "File non trovato" });
@@ -1601,7 +1630,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             const [rows]: any = await pool.query(query, [id]);
             attachments = rows;
         } else {
-            const attachmentsPath = path.join(path.dirname(getDbPath()), 'attachments_meta.json');
+            const attachmentsPath = getAttachmentsMetaPath();
             if (fs.existsSync(attachmentsPath)) {
                 const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
                 attachments = Object.entries(meta)
@@ -1631,7 +1660,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
              await pool.query("DELETE FROM allegati_clienti WHERE id = ?", [id]);
              await pool.query("DELETE FROM allegati_preventivi WHERE id = ?", [id]);
         } else {
-            const attachmentsPath = path.join(path.dirname(getDbPath()), 'attachments_meta.json');
+            const attachmentsPath = getAttachmentsMetaPath();
             const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
             if (meta[id]) {
                 filePath = meta[id].path;
