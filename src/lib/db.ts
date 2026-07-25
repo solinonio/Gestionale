@@ -98,13 +98,8 @@ export const syncWithServer = async (force: boolean = false): Promise<void> => {
         if (fileVal !== undefined) {
           const fileValStr = JSON.stringify(fileVal);
           if (localValStr !== fileValStr) {
-            if (key === 'quotations' && !force) {
-                console.log(`[sync] Skipping overwrite of ${key} from server to protect local data.`);
-            } else {
-                console.log(`[sync] Overwriting ${key} from server.`);
-                safeSetItem(key, fileValStr);
-                hasChanges = true;
-            }
+            safeSetItem(key, fileValStr);
+            hasChanges = true;
           }
         } else if (localValStr !== null) {
           try {

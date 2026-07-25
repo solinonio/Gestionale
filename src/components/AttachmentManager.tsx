@@ -15,30 +15,38 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
     const files = e.target.files;
     if (!files || files.length === 0 || !onChange) return;
 
-    const newAttachments: Attachment[] = [...attachments];
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const reader = new FileReader();
-      reader.onload = (uploadEvent) => {
-        const dataUrl = uploadEvent.target?.result as string;
-        if (dataUrl) {
-          const newAtt: Attachment = {
-            id: Date.now().toString() + Math.random().toString(36).substring(2, 5),
-            filename: file.name,
-            mimeType: file.type || 'application/octet-stream',
-            size: file.size,
-            dataUrl,
-            uploadedAt: new Date().toLocaleDateString('it-IT') + ' ' + new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+    const fileList = Array.from(files);
+    
+    Promise.all(
+      fileList.map((file: File, index: number) => {
+        return new Promise<Attachment>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (uploadEvent) => {
+            const dataUrl = uploadEvent.target?.result as string;
+            if (dataUrl) {
+              resolve({
+                id: `${Date.now()}-${index}-${Math.random().toString(36).substring(2, 7)}`,
+                filename: file.name,
+                mimeType: file.type || 'application/octet-stream',
+                size: file.size,
+                dataUrl,
+                uploadedAt: new Date().toLocaleDateString('it-IT') + ' ' + new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+              });
+            } else {
+              reject(new Error('Failed to read file'));
+            }
           };
-          newAttachments.push(newAtt);
-          if (onChange) {
-            onChange([...newAttachments]);
-          }
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(file);
+        });
+      })
+    ).then((addedAttachments) => {
+      if (onChange) {
+        onChange([...attachments, ...addedAttachments]);
+      }
+    }).catch((err) => {
+      console.error('Errore durante la lettura degli allegati:', err);
+    });
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
