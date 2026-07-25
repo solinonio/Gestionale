@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getQuotations, deleteQuotation, saveQuotation, getClients, getCompanyProfile } from '../lib/db';
 import { Quotation } from '../types';
 import QuotationForm from './QuotationForm';
-import { Plus, Trash2, Copy, ChevronLeft, ChevronRight, Paperclip, BarChart2, TrendingUp, Filter, Check, Sliders, Info, RefreshCw, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Copy, ChevronLeft, ChevronRight, BarChart2, TrendingUp, Filter, Check, Sliders, Info, RefreshCw, ChevronUp, ChevronDown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ComposedChart, Line, ScatterChart, Scatter, ZAxis } from 'recharts';
 
 interface Props {
@@ -47,121 +47,6 @@ export default function QuotationManager({ setActiveTab, initialCreating, initia
       setSortDirection('desc'); // Default to descending when changing fields
     }
     setCurrentPage(1);
-  };
-
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatusMsg, setSyncStatusMsg] = useState<{ type: 'success' | 'info' | 'error', text: string } | null>(null);
-
-  const handleSyncAttachments = async () => {
-    setIsSyncing(true);
-    setSyncStatusMsg(null);
-    try {
-      // 1. Fetch all clients
-      const clientsList = await getClients();
-      
-      // 2. Fetch the company profile info for defaults
-      const companyInfo = await getCompanyProfile() || {
-        name: '', address: '', cap: '', city: '', phone: '', email: '', vatNumber: '', sdiCode: '', pec: '',
-        presentationText: '', conditionsText: ''
-      };
-
-      // 3. Fetch latest quotations to make sure we compare accurately
-      const currentQuotations = await getQuotations();
-
-      let addedCount = 0;
-
-      // 4. Iterate over each client
-      for (const client of clientsList) {
-        // Collect ALL attachments from this client (both array and legacy single fields)
-        const allClientAttachments: {
-          id: string;
-          path: string;
-          filename: string;
-          date: string;
-          progressive: string;
-          amount: number;
-        }[] = [];
-
-        // Logic for client attachments removed as it is now managed via AttachmentManager
-        if (allClientAttachments.length === 0) continue;
-
-        for (const att of allClientAttachments) {
-          // Double check if this attachment already has a matching quotation in the database
-          // Match by client ID, number/progressive, and date OR by exact attachment path
-          const alreadyExists = currentQuotations.some(q => 
-            (q.clientId === client.id && q.number === att.progressive && q.date === att.date)
-          );
-
-          if (!alreadyExists) {
-            // Re-parse the year for safety
-            const parsedYear = new Date(att.date).getFullYear() || new Date().getFullYear();
-
-            const newQuotation = {
-              clientId: client.id,
-              number: att.progressive,
-              year: parsedYear,
-              status: 'DRAFT' as const,
-              date: att.date,
-              totalAmount: att.amount,
-              companyInfo: companyInfo,
-              clientInfo: client,
-              rows: [
-                {
-                  id: Date.now().toString(36) + "-r1-" + Math.random().toString(36).substring(2, 5),
-                  description: `PREVENTIVO ALLEGATO - PROG. ${att.progressive} - PDF: ${att.filename}`,
-                  quantity: 1,
-                  price: att.amount,
-                  discount: null,
-                  isDescriptionOnly: false,
-                  isOmaggio: false
-                }
-              ],
-              notes: `Generato automaticamente dalla sincronizzazione degli allegati PDF in Anagrafiche.`,
-              internalNotes: `Allegato PDF associato: ${att.filename}\nPercorso: ${att.path}`,
-              internalRows: [],
-              condizioni: companyInfo.conditionsText || '',
-              presentationText: companyInfo.presentationText || '',
-              showTotal: true,
-              attachment: att.path,
-              attachmentDate: att.date,
-              attachmentProgressive: att.progressive,
-              attachmentAmount: att.amount,
-              isImported: true
-            };
-
-            await saveQuotation(newQuotation);
-            addedCount++;
-          }
-        }
-      }
-
-      if (addedCount > 0) {
-        setSyncStatusMsg({
-          type: 'success',
-          text: `Sincronizzazione completata! Aggiunti ${addedCount} nuovi preventivi dagli allegati dei clienti.`
-        });
-        // Reload quotations
-        const refreshed = await getQuotations();
-        setQuotations(refreshed);
-      } else {
-        setSyncStatusMsg({
-          type: 'info',
-          text: 'Tutti gli allegati dei clienti sono già sincronizzati nella tabella preventivi.'
-        });
-      }
-    } catch (error) {
-      console.error('Errore durante la sincronizzazione:', error);
-      setSyncStatusMsg({
-        type: 'error',
-        text: 'Si è verificato un errore durante la sincronizzazione degli allegati.'
-      });
-    } finally {
-      setIsSyncing(false);
-      // Auto clear message after 5 seconds
-      setTimeout(() => {
-        setSyncStatusMsg(null);
-      }, 5000);
-    }
   };
 
   useEffect(() => {
@@ -685,41 +570,9 @@ export default function QuotationManager({ setActiveTab, initialCreating, initia
         )}
       </div>
 
-      {syncStatusMsg && (
-        <div className={`p-4 rounded-xl border flex items-start gap-2.5 text-sm transition-all ${
-          syncStatusMsg.type === 'success' 
-            ? 'bg-emerald-50 border-emerald-200 text-emerald-900' 
-            : syncStatusMsg.type === 'error'
-            ? 'bg-red-50 border-red-200 text-red-900'
-            : 'bg-blue-50 border-blue-200 text-blue-900'
-        }`}>
-          <Info size={16} className="shrink-0 mt-0.5" />
-          <div className="flex-1 font-medium">{syncStatusMsg.text}</div>
-          <button 
-            onClick={() => setSyncStatusMsg(null)}
-            className="text-gray-400 hover:text-gray-600 font-bold ml-2 text-xs cursor-pointer p-1"
-          >
-            &times;
-          </button>
-        </div>
-      )}
-
       <div className="flex justify-between items-center pb-3 border-b border-gray-200">
         <h3 className="text-xl font-bold text-gray-900">I Tuoi Preventivi ({filteredQuotations.length})</h3>
         <div className="flex gap-2">
-            <button
-              onClick={handleSyncAttachments}
-              disabled={isSyncing}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-all cursor-pointer ${
-                isSyncing 
-                  ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
-                  : 'bg-white text-gray-700 hover:text-gray-900 border border-gray-300 hover:bg-gray-50'
-              }`}
-              title="Sincronizza allegati dalle anagrafiche clienti"
-            >
-              <RefreshCw size={16} className={isSyncing ? "animate-spin" : ""} />
-              {isSyncing ? "Sincronizzazione..." : "Sincronizza Allegati"}
-            </button>
             <button onClick={() => { setEditingQuotation(null); setIsCreating(true); }} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-all cursor-pointer">
             <Plus size={18} /> Aggiungi
             </button>
@@ -892,7 +745,6 @@ export default function QuotationManager({ setActiveTab, initialCreating, initia
               <tr key={`${q.id}-${index}`} className="border-b border-gray-200 last:border-b-0 hover:bg-gray-50/80 transition-colors w-full">
                 <td className="px-6 py-4 cursor-pointer text-blue-800 hover:text-blue-950 font-bold hover:underline" onClick={() => { setEditingQuotation(q); setIsCreating(true); }}>
                   {q.number}/{q.year % 100}
-                  {q.attachment && <Paperclip size={14} className="inline ml-2 text-gray-500" />}
                 </td>
                 <td className="px-6 py-4">{formatDate(q.date)}</td>
                 <td className="px-6 py-4">{q.clientInfo?.intestazione || q.clientInfo?.name}</td>

@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CompanyInfo, Client, Quotation, QuotationRow, InternalRow } from '../types';
-import { Plus, Save, FileText, Eye, EyeOff, Download, FolderOpen, HelpCircle, X, User, Zap, Brain, MessageSquare, Notebook, Trash2, Bold, List, Paperclip, Loader2, FileUp, HardDrive, Copy, Check, ExternalLink, Settings } from 'lucide-react';
-import { getCompanyProfile, saveQuotation, getQuotations, updateQuotation, getClients, addClient, getAttachments, uploadAttachment, downloadAttachment, deleteAttachment } from '../lib/db';
-import { AttachmentManager } from './AttachmentManager';
-import { connectNasFolder, getFileFromNas, getNasFolderHandle } from '../lib/nasBridge';
+import { Plus, Save, FileText, Eye, EyeOff, Download, X, User, Zap, MessageSquare, Trash2, Loader2, Copy, Check, Settings } from 'lucide-react';
+import { getCompanyProfile, saveQuotation, getQuotations, updateQuotation, getClients, addClient } from '../lib/db';
 import QuillEditor from './QuillEditor';
 import ClientSelectorPopup from './ClientSelectorPopup';
 import PDFPreviewModal from './PDFPreviewModal';
@@ -33,17 +31,6 @@ const cleanHtmlText = (html: string) => {
     return text.trim();
 };
 
-export const isNasLinkPath = (path: string | null): boolean => {
-  if (!path) return false;
-  return path.startsWith('\\\\') || path.startsWith('smb://') || /^[a-zA-Z]:\\/.test(path) || path.startsWith('nas://');
-};
-
-export const getFileNameFromPath = (path: string | null): string => {
-  if (!path) return '';
-  const parts = path.split(/[/\\]/);
-  return parts[parts.length - 1] || path;
-};
-
 export default function QuotationForm(props: { onSave?: () => void, editingQuotation?: Quotation }) {
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>({ name: '', address: '', cap: '', city: '', phone: '', email: '', vatNumber: '', sdiCode: '', pec: '' });
   const [clientInfo, setClientInfo] = useState<Client>({ id: '', name: '', email: '', address: '', phone: '', vatNumber: '', sdiCode: '', cap: '', city: '' });
@@ -57,19 +44,14 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
   const [quotationNumber, setQuotationNumber] = useState<string>('1');
   const [quotationYear, setQuotationYear] = useState<number>(new Date().getFullYear());
   const [quotationLetter, setQuotationLetter] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'anagrafica' | 'preventivo' | 'noteCliente' | 'noteInterne' | 'allegati'>('anagrafica');
+  const [activeTab, setActiveTab] = useState<'anagrafica' | 'preventivo' | 'noteCliente' | 'noteInterne'>('anagrafica');
 // ...
   const tabs = [
       { id: 'anagrafica', label: 'Anagrafica', icon: <User size={16} /> },
       { id: 'preventivo', label: 'Preventivo', icon: <FileText size={16} /> },
       { id: 'noteCliente', label: 'Note Cliente', icon: <MessageSquare size={16} /> },
       { id: 'noteInterne', label: 'Simulatore', icon: <Zap size={16} /> },
-      { id: 'allegati', label: 'Allegati', icon: <FolderOpen size={16} /> },
   ] as const;
-
-  const [isUploading, setIsUploading] = useState(false);
-  const [isViewerOpen, setIsViewerOpen] = useState(false);
-  const [activeViewerPath, setActiveViewerPath] = useState<string | null>(null);
 
   const [quotationDate, setQuotationDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState<string>('');
@@ -1080,7 +1062,7 @@ Ecco il testo del PDF da analizzare:
                                 className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-700 hover:bg-blue-800 text-white shadow hover:shadow-md transition-all relative border border-blue-600 cursor-pointer group"
                                 title="Aggiungi Nuovo Cliente in Anagrafica"
                               >
-                                <Notebook size={14} />
+                                <User size={14} />
                                 <span className="absolute -top-1 -right-1 bg-emerald-500 text-white font-extrabold rounded-full w-3.5 h-3.5 text-[9px] flex items-center justify-center border border-white">
                                   +
                                 </span>
@@ -1405,35 +1387,6 @@ Ecco il testo del PDF da analizzare:
                   <div className="text-right font-bold text-sm text-gray-900">Totale Costi: €{internalTotal.toFixed(2)}</div>
                 </div>
             )}
-
-            {activeTab === 'allegati' && (
-                <div className="bg-gray-100 p-6 rounded-lg shadow-sm border border-gray-300 space-y-4 text-gray-900">
-                  <div className='flex justify-end mb-2'>
-                      <button onClick={() => setActiveTab(null)} className="text-gray-700 hover:text-gray-900 text-sm cursor-pointer font-semibold bg-white border border-gray-300 px-3 py-1 rounded shadow-sm hover:bg-gray-50">Chiudi</button>
-                  </div>
-                  <h3 className="font-bold text-lg text-gray-950 mb-1 font-sans flex items-center gap-2">
-                    <FolderOpen className="text-blue-700" size={22} />
-                    <span>Gestione Allegati Preventivo</span>
-                  </h3>
-                  
-                  {/* GESTIONE ALLEGATI UNIFICATA */}
-                  <div className="bg-white p-5 rounded-lg border border-blue-200 shadow-sm">
-                    <AttachmentManager 
-                      type="quotation" 
-                      id={props.editingQuotation?.id || 'new'} 
-                      title="Link Allegati (NAS/PC)"
-                    />
-                    <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-100">
-                      <p className="text-[10px] text-blue-800 leading-relaxed font-medium">
-                        <strong>Istruzioni:</strong> Clicca sul pulsante per selezionare un file dal tuo PC. 
-                        Il sistema salverà automaticamente il link completo utilizzando il percorso radice configurato (icona ingranaggio).
-                        Per aprire il file, usa il pulsante <strong>COPIA PERCORSO</strong> e incollalo in una cartella di Windows.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-            )}
-
         </div>
       </div>
         <div className="fixed bottom-0 left-0 w-full bg-gray-900 border-t border-gray-700 p-4 flex justify-between items-center shadow-lg px-6 text-white z-40">
@@ -1505,224 +1458,7 @@ Ecco il testo del PDF da analizzare:
         onSelect={(client) => { setClientInfo(client); setShowClientSelector(false); }} 
       />
       
-      
       {/* Salva disabilitato */}
-      {showPdfSaveModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[60] backdrop-blur-sm animate-fade-in">
-          <div className="bg-white text-gray-900 rounded-xl shadow-2xl border border-gray-200 max-w-md w-full overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white px-6 py-4 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <FileText size={18} />
-                <h3 className="font-bold text-base tracking-wide text-white">Salvataggio Documento PDF</h3>
-              </div>
-              <button 
-                onClick={() => { setShowPdfSaveModal(false); setPendingPdfDoc(null); }}
-                className="text-white/80 hover:text-white transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                  Nome del file da salvare
-                </label>
-                <input 
-                  type="text"
-                  value={pdfFilename}
-                  onChange={(e) => setPdfFilename(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent font-medium"
-                  placeholder="Inserisci il nome del file..."
-                />
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 space-y-1">
-                <p className="font-semibold flex items-center gap-1">
-                  <HelpCircle size={13} />
-                  Come scegliere la cartella di salvataggio?
-                </p>
-                <p>
-                  Per scegliere una cartella specifica sul tuo computer:
-                </p>
-                <ul className="list-disc pl-4 space-y-0.5">
-                  {typeof (window as any).showSaveFilePicker === 'function' && (
-                    <li>Clicca su <b>"Sfoglia e Salva"</b> per aprire il selettore del sistema operativo.</li>
-                  )}
-                  <li>In alternativa, abilita l'opzione <b>"Chiedi dove salvare i file prima di scaricarli"</b> nelle impostazioni del tuo browser (Chrome, Edge, Firefox, ecc.).</li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 px-6 py-4 flex flex-col sm:flex-row justify-end gap-2 border-t border-gray-100">
-              <button 
-                onClick={() => { setShowPdfSaveModal(false); setPendingPdfDoc(null); }}
-                className="px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700 transition-colors border border-gray-300 bg-white rounded-lg hover:bg-gray-50 cursor-pointer"
-              >
-                Annulla
-              </button>
-              
-              <button 
-                onClick={() => handleSavePdfConfirmed(false)}
-                className="px-4 py-2 text-sm font-semibold text-white bg-gray-600 hover:bg-gray-700 transition-colors rounded-lg flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
-                title="Salva direttamente nella cartella Download del browser"
-              >
-                <Download size={15} />
-                <span>Download Standard</span>
-              </button>
-
-              {typeof (window as any).showSaveFilePicker === 'function' && (
-                <button 
-                  onClick={() => handleSavePdfConfirmed(true)}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-600 transition-colors rounded-lg flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
-                  title="Consente di scegliere la cartella e il nome tramite il dialogo del sistema operativo"
-                >
-                  <FolderOpen size={15} />
-                  <span>Sfoglia e Salva</span>
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* PDF Viewer Popup Modal */}
-      {activeViewerPath && (
-        <PDFViewerModal 
-          isOpen={!!activeViewerPath}
-          onClose={() => setActiveViewerPath(null)}
-          pdfPath={activeViewerPath}
-        />
-      )}
     </div>
   );
 }
-
-// PDF Viewer Modal component
-interface PDFViewerModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  pdfPath: string;
-}
-
-function PDFViewerModal({ isOpen, onClose, pdfPath }: PDFViewerModalProps) {
-  if (!isOpen) return null;
-
-  const isNas = isNasLinkPath(pdfPath);
-
-  return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-      <div className="bg-white rounded-xl shadow-2xl border border-gray-300 w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden text-gray-950">
-        {/* Header */}
-        <div className="bg-gray-950 text-white px-6 py-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold">Visualizzatore PDF Allegato</h3>
-          <div className="flex gap-2">
-            {!isNas && (
-              <button
-                onClick={() => window.open(pdfPath, '_blank')}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-1.5 rounded transition-all cursor-pointer"
-              >
-                Apri in nuova scheda
-              </button>
-            )}
-            <button
-              onClick={onClose}
-              className="text-white hover:text-gray-300 font-bold text-xl leading-none cursor-pointer"
-            >
-              &times;
-            </button>
-          </div>
-        </div>
-        
-        {/* Iframe or NAS copy panel content */}
-        <div className="flex-1 bg-gray-50 relative flex flex-col">
-          {isNas ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
-              <div className="p-4 bg-purple-100 rounded-full text-purple-600">
-                <HardDrive size={48} />
-              </div>
-              <div className="max-w-md space-y-3">
-                <h4 className="text-lg font-bold text-gray-900">Collegamento File su NAS / Rete</h4>
-                <p className="text-sm text-gray-650">
-                  Questo allegato è memorizzato localmente nella tua rete o sul NAS. Per motivi di sicurezza, i browser web non consentono di lanciare direttamente file di rete o cartelle locali.
-                </p>
-                <div className="text-xs text-gray-600 font-mono bg-gray-100 p-4 rounded-lg border border-gray-355 break-all select-all relative group">
-                  <span className="block mb-1 text-[10px] uppercase text-gray-400 font-sans tracking-wider font-semibold">Percorso File:</span>
-                  {pdfPath}
-                </div>
-                <p className="text-xs text-orange-600 font-bold">
-                  Per visualizzare questo file, usa il tasto "Visualizza" nella lista allegati (richiede NAS connesso).
-                </p>
-              </div>
-            </div>
-          ) : (
-            <iframe
-              src={pdfPath}
-              className="w-full h-full border-none"
-              title="PDF Viewer"
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const convertPdfToImages = async (pdfDataUrl: string): Promise<string[]> => {
-  return new Promise((resolve, reject) => {
-    if (!(window as any).pdfjsLib) {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
-      script.onload = () => {
-        const pdfjsLib = (window as any).pdfjsLib;
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-        startConversion(pdfjsLib, pdfDataUrl, resolve, reject);
-      };
-      script.onerror = (e) => reject(new Error('Failed to load PDF library.'));
-      document.head.appendChild(script);
-    } else {
-      const pdfjsLib = (window as any).pdfjsLib;
-      startConversion(pdfjsLib, pdfDataUrl, resolve, reject);
-    }
-  });
-};
-
-const startConversion = async (pdfjsLib: any, pdfDataUrl: string, resolve: any, reject: any) => {
-  try {
-    const base64Content = pdfDataUrl.split(',')[1];
-    const raw = window.atob(base64Content);
-    const rawLength = raw.length;
-    const array = new Uint8Array(new ArrayBuffer(rawLength));
-    for (let i = 0; i < rawLength; i++) {
-      array[i] = raw.charCodeAt(i);
-    }
-
-    const loadingTask = pdfjsLib.getDocument({ data: array });
-    const pdf = await loadingTask.promise;
-    const images: string[] = [];
-
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 2.0 }); // high resolution
-      
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-      if (!context) continue;
-
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-
-      const renderContext = {
-        canvasContext: context,
-        viewport: viewport
-      };
-
-      await page.render(renderContext).promise;
-      images.push(canvas.toDataURL('image/jpeg', 0.85));
-    }
-
-    resolve(images);
-  } catch (error) {
-    reject(error);
-  }
-};

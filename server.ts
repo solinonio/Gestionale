@@ -6,36 +6,7 @@ import crypto from "crypto";
 import os from "os";
 import mysql from "mysql2/promise";
 import { GoogleGenAI, Type } from "@google/genai";
-import multer from 'multer';
 import AdmZip from 'adm-zip';
-
-// Configure multer
-const UPLOAD_ROOT = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(UPLOAD_ROOT)) {
-  fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const { type, id } = req.params;
-    // Unify subdirectories: type can be 'client', 'quotation', or a generic category
-    const subDir = type === 'client' ? 'Clienti' : (type === 'quotation' ? 'Preventivi' : type);
-    const targetDir = path.join(UPLOAD_ROOT, subDir, id || 'unknown');
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
-    }
-    cb(null, targetDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, `${uniqueSuffix}-${file.originalname}`);
-  }
-});
-
-const upload = multer({ 
-  storage: storage, 
-  limits: { fileSize: 10 * 1024 * 1024 } // Increase to 10MB
-});
 
 function getFallbackCompany(query: string) {
   const cleanQuery = query.trim();
@@ -256,37 +227,6 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     }
   });
 
-  app.get("/api/stream-pdf", (req, res) => {
-    let filePath = req.query.path as string;
-    if (!filePath) return res.status(400).send("Path mancante");
-    
-    // Prevent path traversal
-    if (filePath.includes('..')) return res.status(403).send("Accesso negato");
-    
-    if (!filePath.toLowerCase().endsWith('.pdf')) return res.status(400).send("Solo file PDF permessi");
-    
-    // Legacy mapping (if needed, keep for backward compatibility)
-    if (filePath.toLowerCase().startsWith('\\\\nas\\preventivi\\')) {
-      const fileName = path.basename(filePath, '.pdf');
-      filePath = `/Volumes/NAS/PREVENTIVI/PREV 2026/${fileName}/${fileName}.pdf`;
-    }
-    
-    // Ensure the file is within the NAS volume
-    if (!filePath.startsWith('/Volumes/NAS/')) {
-      console.error(`[Server] Accesso negato a percorso non autorizzato: ${filePath}`);
-      return res.status(403).send("Accesso a questo percorso non autorizzato");
-    }
-    
-    if (!fs.existsSync(filePath)) {
-      console.error(`[Server] File non trovato: ${filePath}`);
-      return res.status(404).send("File non trovato");
-    }
-    
-    res.setHeader('Content-Type', 'application/pdf');
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
-  });
-
   app.post("/api/gemini", async (req, res) => {
     try {
       const { prompt } = req.body;
@@ -465,28 +405,31 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             \`value\` LONGTEXT NOT NULL
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
+        
+        // Drop legacy attachment tables as requested
+        try {
+          await connection.query("DROP TABLE IF EXISTS allegati_clienti");
+          await connection.query("DROP TABLE IF EXISTS allegati_preventivi");
+        } catch (dropErr) {
+          console.warn("[MariaDB] Errore durante il drop delle tabelle allegati:", dropErr);
+        }
+
         await connection.query(`
-          CREATE TABLE IF NOT EXISTS allegati_clienti (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            cliente_id VARCHAR(100) NOT NULL,
-            nome_file VARCHAR(255) NOT NULL,
-            nome_originale TEXT NOT NULL,
-            percorso_file TEXT NOT NULL,
-            dimensione INT NOT NULL,
-            data_caricamento DATETIME DEFAULT CURRENT_TIMESTAMP
+          CREATE TABLE IF NOT EXISTS Anagrafiche_Clienti (
+            \`id\` VARCHAR(100) PRIMARY KEY,
+            \`name\` VARCHAR(255) NOT NULL,
+            \`intestazione\` VARCHAR(255),
+            \`email\` VARCHAR(255),
+            \`phone\` VARCHAR(100),
+            \`address\` TEXT,
+            \`cap\` VARCHAR(20),
+            \`city\` VARCHAR(100),
+            \`vatNumber\` VARCHAR(100),
+            \`sdiCode\` VARCHAR(50),
+            \`json_data\` LONGTEXT NOT NULL
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
-        await connection.query(`
-          CREATE TABLE IF NOT EXISTS allegati_preventivi (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            preventivo_id VARCHAR(100) NOT NULL,
-            nome_file VARCHAR(255) NOT NULL,
-            nome_originale TEXT NOT NULL,
-            percorso_file TEXT NOT NULL,
-            dimensione INT NOT NULL,
-            data_caricamento DATETIME DEFAULT CURRENT_TIMESTAMP
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        `);
+        
         await connection.query(`
           CREATE TABLE IF NOT EXISTS preventivi (
             \`id\` VARCHAR(100) PRIMARY KEY,
@@ -511,6 +454,45 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             \`json_data\` LONGTEXT NOT NULL
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
+
+        // Automatic migration of legacy clients from app_store to Anagrafiche_Clienti
+        try {
+          const [clientCountRows]: any = await connection.query("SELECT COUNT(*) as cnt FROM Anagrafiche_Clienti");
+          if (clientCountRows[0].cnt === 0) {
+            const [legacyRows]: any = await connection.query("SELECT `value` FROM app_store WHERE `key` = 'clients'");
+            if (legacyRows.length > 0) {
+              console.log("[MariaDB] Rilevate anagrafiche pregressi in app_store, avvio migrazione...");
+              const legacyClients = JSON.parse(legacyRows[0].value);
+              if (Array.isArray(legacyClients)) {
+                for (const c of legacyClients) {
+                  if (!c.id) continue;
+                  const stringified = JSON.stringify(c);
+                  await connection.query(
+                    `INSERT INTO Anagrafiche_Clienti 
+                     (\`id\`, \`name\`, \`intestazione\`, \`email\`, \`phone\`, \`address\`, \`cap\`, \`city\`, \`vatNumber\`, \`sdiCode\`, \`json_data\`) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                      c.id, 
+                      c.name || "", 
+                      c.intestazione || "", 
+                      c.email || "", 
+                      c.phone || "", 
+                      c.address || "", 
+                      c.cap || "", 
+                      c.city || "", 
+                      c.vatNumber || "", 
+                      c.sdiCode || "", 
+                      stringified
+                    ]
+                  );
+                }
+                console.log(`[MariaDB] Migrazione anagrafiche completata: ${legacyClients.length} record trasferiti.`);
+              }
+            }
+          }
+        } catch (migErr: any) {
+          console.warn("[MariaDB] Errore durante la migrazione delle anagrafiche:", migErr.message);
+        }
 
         // Automatic migration of legacy quotations from app_store to preventivi table
         try {
@@ -699,6 +681,33 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             // Non sovrascrivere se non riusciamo a caricare, così rimane quello in app_store o default
           }
 
+          // Fetch from dedicated Anagrafiche_Clienti table
+          try {
+            const [cRows]: any = await pool.query("SELECT `id`, `name`, `intestazione`, `email`, `phone`, `address`, `cap`, `city`, `vatNumber`, `sdiCode`, `json_data` FROM Anagrafiche_Clienti");
+            const clients = [];
+            for (const cRow of cRows) {
+              try {
+                const c = JSON.parse(cRow.json_data);
+                if (cRow.id) c.id = cRow.id;
+                if (cRow.name) c.name = cRow.name;
+                if (cRow.intestazione !== undefined && cRow.intestazione !== null) c.intestazione = cRow.intestazione;
+                if (cRow.email !== undefined && cRow.email !== null) c.email = cRow.email;
+                if (cRow.phone !== undefined && cRow.phone !== null) c.phone = cRow.phone;
+                if (cRow.address !== undefined && cRow.address !== null) c.address = cRow.address;
+                if (cRow.cap !== undefined && cRow.cap !== null) c.cap = cRow.cap;
+                if (cRow.city !== undefined && cRow.city !== null) c.city = cRow.city;
+                if (cRow.vatNumber !== undefined && cRow.vatNumber !== null) c.vatNumber = cRow.vatNumber;
+                if (cRow.sdiCode !== undefined && cRow.sdiCode !== null) c.sdiCode = cRow.sdiCode;
+                clients.push(c);
+              } catch (e) {
+                console.error("[MariaDB] Errore nel parsing dell'anagrafica cliente:", e);
+              }
+            }
+            data["clients"] = clients;
+          } catch (cErr: any) {
+            console.error("[MariaDB] Errore nel caricamento delle anagrafiche dalla tabella Anagrafiche_Clienti:", cErr.message);
+          }
+
           return res.json({ success: true, dbType: "mariadb", data });
         } catch (err: any) {
           console.warn("[MariaDB] Impossibile connettersi o interrogare MariaDB, ricado su JSON locale:", err.message);
@@ -778,6 +787,31 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
                   [
                     q.id, numero, anno, dataPrev, cliente, totale, stringified,
                     numero, anno, dataPrev, cliente, totale, stringified
+                  ]
+                );
+              }
+            } else if (key === "clients" && Array.isArray(val)) {
+              // Upsert each incoming client in its own row
+              const incomingIds = val.map((c: any) => c.id).filter(Boolean);
+              
+              if (incomingIds.length > 0) {
+                await pool.query("DELETE FROM Anagrafiche_Clienti WHERE id NOT IN (?)", [incomingIds]);
+              } else {
+                await pool.query("DELETE FROM Anagrafiche_Clienti");
+              }
+
+              for (const c of val) {
+                if (!c.id) continue;
+                const stringified = JSON.stringify(c);
+                await pool.query(
+                  `INSERT INTO Anagrafiche_Clienti 
+                   (\`id\`, \`name\`, \`intestazione\`, \`email\`, \`phone\`, \`address\`, \`cap\`, \`city\`, \`vatNumber\`, \`sdiCode\`, \`json_data\`) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+                   ON DUPLICATE KEY UPDATE 
+                     \`name\` = ?, \`intestazione\` = ?, \`email\` = ?, \`phone\` = ?, \`address\` = ?, \`cap\` = ?, \`city\` = ?, \`vatNumber\` = ?, \`sdiCode\` = ?, \`json_data\` = ?`,
+                  [
+                    c.id, c.name || "", c.intestazione || "", c.email || "", c.phone || "", c.address || "", c.cap || "", c.city || "", c.vatNumber || "", c.sdiCode || "", stringified,
+                    c.name || "", c.intestazione || "", c.email || "", c.phone || "", c.address || "", c.cap || "", c.city || "", c.vatNumber || "", c.sdiCode || "", stringified
                   ]
                 );
               }
@@ -1160,6 +1194,22 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
                       ]
                     );
                   }
+                } else if (key === "clients" && Array.isArray(val)) {
+                  for (const c of val) {
+                    if (!c.id) continue;
+                    const stringified = JSON.stringify(c);
+                    await pool.query(
+                      `INSERT INTO Anagrafiche_Clienti 
+                       (\`id\`, \`name\`, \`intestazione\`, \`email\`, \`phone\`, \`address\`, \`cap\`, \`city\`, \`vatNumber\`, \`sdiCode\`, \`json_data\`) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+                       ON DUPLICATE KEY UPDATE 
+                         \`name\` = ?, \`intestazione\` = ?, \`email\` = ?, \`phone\` = ?, \`address\` = ?, \`cap\` = ?, \`city\` = ?, \`vatNumber\` = ?, \`sdiCode\` = ?, \`json_data\` = ?`,
+                      [
+                        c.id, c.name || "", c.intestazione || "", c.email || "", c.phone || "", c.address || "", c.cap || "", c.city || "", c.vatNumber || "", c.sdiCode || "", stringified,
+                        c.name || "", c.intestazione || "", c.email || "", c.phone || "", c.address || "", c.cap || "", c.city || "", c.vatNumber || "", c.sdiCode || "", stringified
+                      ]
+                    );
+                  }
                 } else {
                   const stringified = JSON.stringify(val);
                   await pool.query(
@@ -1393,295 +1443,6 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
 
   // ... existing endpoints
 
-  // Attachment endpoints (New robust version)
-  app.post("/api/upload/:type/:id", upload.single('file'), async (req, res) => {
-    console.log("Upload request received:", req.params);
-    try {
-      const { type, id } = req.params;
-      const { originalPath } = req.body;
-      const file = req.file;
-      console.log("File received:", file, "Original path:", originalPath);
-      if (!file) return res.status(400).json({ success: false, error: "Nessun file caricato" });
-      
-      const config = getDbConfig();
-      // Store relative path for portability
-      const relativePath = path.relative(UPLOAD_ROOT, file.path);
-      
-      const displayName = originalPath || file.originalname;
-      
-      const insertQuery = type === 'client' 
-        ? "INSERT INTO allegati_clienti (cliente_id, nome_file, nome_originale, percorso_file, dimensione) VALUES (?, ?, ?, ?, ?)"
-        : "INSERT INTO allegati_preventivi (preventivo_id, nome_file, nome_originale, percorso_file, dimensione) VALUES (?, ?, ?, ?, ?)";
-      
-      const insertParams = [id, file.filename, displayName, relativePath, file.size];
-
-      let insertedId = null;
-      if (config.dbType === 'mariadb') {
-        const pool = await getMariaPool(config);
-        const [result]: any = await pool.query(insertQuery, insertParams);
-        insertedId = result.insertId;
-      } else {
-        // Fallback for JSON
-        const attachmentsPath = getAttachmentsMetaPath();
-        let meta: any = {};
-        if (fs.existsSync(attachmentsPath)) meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
-        insertedId = crypto.randomUUID();
-        meta[insertedId] = { 
-          id: insertedId,
-          type, 
-          parentId: id, 
-          nome_file: file.filename,
-          nome_originale: displayName,
-          percorso_file: relativePath,
-          dimensione: file.size,
-          data_caricamento: new Date().toISOString()
-        };
-        fs.writeFileSync(attachmentsPath, JSON.stringify(meta, null, 2), "utf-8");
-      }
-
-      res.json({ success: true, file, attachmentId: insertedId, relativePath });
-    } catch (err: any) {
-      console.error("Errore upload:", err);
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // Helper for metadata path
-  const getAttachmentsMetaPath = () => path.join(process.cwd(), 'data', 'attachments_meta.json');
-
-  app.post("/api/attachments/link", async (req, res) => {
-    try {
-        const { path: filePath, type, id } = req.body;
-        if (!filePath || !type || !id) {
-            return res.status(400).json({ success: false, error: "Dati mancanti" });
-        }
-
-        console.log(`Linking file: ${filePath} to ${type} ${id}`);
-        const config = getDbConfig();
-        
-        if (config.dbType === 'mariadb') {
-            const pool = await getMariaPool(config);
-            const table = type === 'client' ? 'allegati_clienti' : 'allegati_preventivi';
-            const idField = type === 'client' ? 'cliente_id' : 'preventivo_id';
-            
-            await pool.query(
-                `INSERT INTO ${table} (${idField}, nome_file, nome_originale, percorso_file, dimensione) VALUES (?, ?, ?, ?, ?)`,
-                [id, 'manual_link', filePath, filePath, 0]
-            );
-        } else {
-            const attachmentsPath = getAttachmentsMetaPath();
-            if (!fs.existsSync(path.dirname(attachmentsPath))) {
-              fs.mkdirSync(path.dirname(attachmentsPath), { recursive: true });
-            }
-            
-            let meta = {};
-            if (fs.existsSync(attachmentsPath)) {
-                meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
-            }
-            const attachmentId = crypto.randomUUID();
-            meta[attachmentId] = {
-                id: attachmentId,
-                type,
-                parentId: id,
-                nome_originale: filePath,
-                percorso_file: filePath,
-                nome_file: 'manual_link',
-                dimensione: 0,
-                data_caricamento: new Date().toISOString()
-            };
-            fs.writeFileSync(attachmentsPath, JSON.stringify(meta, null, 2));
-            console.log("Metadata saved to:", attachmentsPath);
-        }
-
-        res.json({ success: true });
-    } catch (err: any) {
-        console.error("Errore salvataggio link:", err);
-        res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // API per l'anteprima specifica
-  app.get("/api/attachment-preview/:id", async (req, res) => {
-    const { id } = req.params;
-    console.log(">>> PREVIEW REQUEST ID:", id);
-    try {
-      const config = getDbConfig();
-      let attachment: any = null;
-
-      if (config.dbType === 'mariadb') {
-        const pool = await getMariaPool(config);
-        const [rows]: any = await pool.query(
-          "SELECT id, percorso_file, nome_originale, nome_file FROM allegati_clienti WHERE id = ? UNION SELECT id, percorso_file, nome_originale, nome_file FROM allegati_preventivi WHERE id = ?", 
-          [id, id]
-        );
-        if (rows.length > 0) attachment = rows[0];
-      } else {
-        const attachmentsPath = getAttachmentsMetaPath();
-        console.log("Checking meta at:", attachmentsPath);
-        if (fs.existsSync(attachmentsPath)) {
-          const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
-          attachment = meta[id];
-        }
-      }
-
-      if (!attachment) {
-        console.log("Attachment NOT FOUND for ID:", id);
-        return res.status(404).send(`Allegato con ID ${id} non trovato nel database.`);
-      }
-
-      const originalPath = attachment.nome_originale || attachment.percorso_file;
-      const relativePath = attachment.percorso_file || '';
-
-      console.log("Attachment found. Original Path:", originalPath, "Relative Path:", relativePath);
-
-      // 1. Prova come file caricato fisicamente sul server (uploads)
-      const absolutePath = path.isAbsolute(relativePath) ? relativePath : path.join(UPLOAD_ROOT, relativePath);
-      if (fs.existsSync(absolutePath) && !fs.lstatSync(absolutePath).isDirectory()) {
-        console.log("Serving local file:", absolutePath);
-        if (absolutePath.toLowerCase().endsWith('.pdf')) {
-          res.contentType('application/pdf');
-        }
-        return res.sendFile(absolutePath);
-      } 
-      
-      // 2. Prova come percorso NAS/Locale diretto
-      if (fs.existsSync(originalPath) && !fs.lstatSync(originalPath).isDirectory()) {
-        console.log("Serving NAS/Local file:", originalPath);
-        if (originalPath.toLowerCase().endsWith('.pdf')) {
-          res.contentType('application/pdf');
-        }
-        return res.sendFile(originalPath);
-      }
-
-      console.log("FILE NOT FOUND ON DISK");
-      res.status(404).send(`
-        <html>
-          <body style="font-family: sans-serif; padding: 40px; line-height: 1.6;">
-            <h2 style="color: #e53e3e;">File non trovato fisicamente</h2>
-            <p>Il database ha il collegamento, ma il file non è presente sul server o il server non ha i permessi per accedervi.</p>
-            <div style="background: #f7fafc; padding: 15px; border-radius: 8px; border: 1px solid #edf2f7; font-family: monospace;">
-              <strong>Percorso cercato:</strong> ${originalPath}
-            </div>
-            <p style="margin-top: 20px; font-size: 0.9em; color: #718096;">
-              Se il file si trova su un NAS o su un disco locale dell'utente, il server web non potrà mai visualizzarlo a meno che non sia montato come unità di rete accessibile all'utente che esegue il servizio Node.js.
-            </p>
-          </body>
-        </html>
-      `);
-    } catch (error) {
-      console.error("Errore anteprima:", error);
-      res.status(500).send("Errore durante l'apertura del file");
-    }
-  });
-
-  app.get("/api/attachments/download/:id", async (req, res) => {
-    try {
-        const { id } = req.params;
-        const config = getDbConfig();
-        
-        let relativeFilePath = "";
-        let originalName = "";
-        let isManualLink = false;
-
-        if (config.dbType === 'mariadb') {
-            const pool = await getMariaPool(config);
-            const [rows]: any = await pool.query(
-                "SELECT percorso_file, nome_originale, nome_file FROM allegati_clienti WHERE id = ? UNION SELECT percorso_file, nome_originale, nome_file FROM allegati_preventivi WHERE id = ?", 
-                [id, id]
-            );
-            if (rows.length === 0) return res.status(404).json({ success: false, error: "File non trovato" });
-            relativeFilePath = rows[0].percorso_file;
-            originalName = rows[0].nome_originale;
-            isManualLink = rows[0].nome_file === 'manual_link';
-        } else {
-            const attachmentsPath = getAttachmentsMetaPath();
-            const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
-            const entry = meta[id];
-            if (!entry) return res.status(404).json({ success: false, error: "File non trovato" });
-            relativeFilePath = entry.percorso_file || entry.path;
-            originalName = entry.nome_originale || entry.originalname;
-            isManualLink = entry.nome_file === 'manual_link';
-        }
-
-        if (isManualLink) {
-            return res.status(400).json({ 
-                success: false, 
-                error: "Questo è un collegamento a un file locale o NAS. Copia il percorso e incollalo in una cartella per aprirlo.",
-                path: relativeFilePath
-            });
-        }
-        
-        const absolutePath = path.isAbsolute(relativeFilePath) ? relativeFilePath : path.join(UPLOAD_ROOT, relativeFilePath);
-        
-        if (!fs.existsSync(absolutePath)) {
-            return res.status(404).json({ success: false, error: "File fisico non trovato sul server. Potrebbe essere stato rimosso o spostato." });
-        }
-
-        res.download(absolutePath, originalName);
-    } catch (err: any) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  app.get("/api/attachments/:type/:id", async (req, res) => {
-    try {
-        const { type, id } = req.params;
-        const config = getDbConfig();
-        
-        let attachments: any[] = [];
-        
-        if (config.dbType === 'mariadb') {
-            const pool = await getMariaPool(config);
-            const query = type === 'client' ? "SELECT * FROM allegati_clienti WHERE cliente_id = ?" : "SELECT * FROM allegati_preventivi WHERE preventivo_id = ?";
-            const [rows]: any = await pool.query(query, [id]);
-            attachments = rows;
-        } else {
-            const attachmentsPath = getAttachmentsMetaPath();
-            if (fs.existsSync(attachmentsPath)) {
-                const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
-                attachments = Object.entries(meta)
-                    .filter(([_, v]: any) => v.type === type && (v.parentId === id || v.id === id))
-                    .map(([k, v]: any) => ({ id: k, ...v }));
-            }
-        }
-        res.json({ success: true, attachments });
-    } catch (err: any) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  app.delete("/api/attachments/:id", async (req, res) => {
-    try {
-        const { id } = req.params;
-        const config = getDbConfig();
-        
-        let filePath = "";
-        
-        if (config.dbType === 'mariadb') {
-             const pool = await getMariaPool(config);
-             // Find path and delete row
-             const [rows]: any = await pool.query("SELECT percorso_file FROM allegati_clienti WHERE id = ? UNION SELECT percorso_file FROM allegati_preventivi WHERE id = ?", [id, id]);
-             if (rows.length > 0) filePath = rows[0].percorso_file;
-             
-             await pool.query("DELETE FROM allegati_clienti WHERE id = ?", [id]);
-             await pool.query("DELETE FROM allegati_preventivi WHERE id = ?", [id]);
-        } else {
-            const attachmentsPath = getAttachmentsMetaPath();
-            const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
-            if (meta[id]) {
-                filePath = meta[id].path;
-                delete meta[id];
-                fs.writeFileSync(attachmentsPath, JSON.stringify(meta, null, 2), "utf-8");
-            }
-        }
-        
-        if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        res.json({ success: true });
-    } catch (err: any) {
-        res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
   // Check Software Diff comparing local files and remote GitHub files using SHA-1
   app.post("/api/check-software-diff", async (req, res) => {
     const { repo, branch = "main", token } = req.body;
@@ -1883,99 +1644,6 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
       return res.status(500).json({ success: false, error: err.message });
     }
   });
-
-  // ==========================================
-  // CONFIGURAZIONE CARICAMENTO E GESTIONE PDF
-  // ==========================================
-  const pdfStorage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      const pdfDir = path.join(UPLOAD_ROOT, "pdf_staged");
-      if (!fs.existsSync(pdfDir)) {
-        fs.mkdirSync(pdfDir, { recursive: true });
-      }
-      cb(null, pdfDir);
-    },
-    filename: (req, file, cb) => {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-  });
-
-  const pdfUpload = multer({ 
-    storage: pdfStorage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // Limite di 10MB per file
-    fileFilter: (req, file, cb) => {
-      if (file.mimetype === "application/pdf") {
-        cb(null, true);
-      } else {
-        cb(new Error("Formato non valido. Sono ammessi solo file PDF."));
-      }
-    }
-  });
-
-  // Endpoint API per l'upload del PDF
-  app.post("/api/upload-pdf", (req, res) => {
-    console.log("[Server] Richiesta ricevuta su /api/upload-pdf");
-    pdfUpload.single("pdf")(req, res, (err) => {
-      if (err) {
-        console.error("[Server] Errore multer durante l'upload del PDF:", err);
-      }
-      if (err instanceof multer.MulterError) {
-        return res.status(400).json({ success: false, error: `Errore di upload: ${err.message}` });
-      } else if (err) {
-        return res.status(400).json({ success: false, error: err.message });
-      }
-
-      if (!req.file) {
-        console.warn("[Server] Richiesta di upload PDF ricevuta senza file");
-        return res.status(400).json({ success: false, error: "Nessun file selezionato." });
-      }
-
-      console.log(`[Server] File caricato correttamente: ${req.file.filename} (Originale: ${req.file.originalname})`);
-      // Restituisce i dettagli del file salvato sul server
-      return res.json({ 
-        success: true, 
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        path: `/uploads/pdf_staged/${req.file.filename}` // Questo percorso lo salverai nel tuo database JSON/MariaDB
-      });
-    });
-  });
-
-  // Endpoint API per esportare tutta la cartella 'uploads' come archivio ZIP
-  app.get("/api/export-uploads", (req, res) => {
-    console.log("[Server] Richiesta ricevuta su /api/export-uploads");
-    try {
-      if (!fs.existsSync(UPLOAD_ROOT)) {
-        fs.mkdirSync(UPLOAD_ROOT, { recursive: true });
-      }
-
-      const zip = new AdmZip();
-      
-      // Controlliamo se la cartella contiene file prima di aggiungerla
-      const files = fs.readdirSync(UPLOAD_ROOT);
-      if (files.length === 0) {
-        // Se la cartella è vuota, aggiungiamo un file leggimi per evitare errori e indicare che è vuota
-        zip.addFile("README.txt", Buffer.from("Cartella uploads vuota. Nessun allegato presente.", "utf8"));
-      } else {
-        zip.addLocalFolder(UPLOAD_ROOT);
-      }
-
-      const zipBuffer = zip.toBuffer();
-      const filename = `gestionale_preventivi_uploads_${new Date().toISOString().split('T')[0]}.zip`;
-
-      res.setHeader("Content-Type", "application/zip");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      res.setHeader("Content-Length", zipBuffer.length);
-      res.send(zipBuffer);
-    } catch (err: any) {
-      console.error("[Server] Errore durante l'esportazione ZIP degli uploads:", err);
-      res.status(500).json({ success: false, error: `Errore durante la creazione dello ZIP: ${err.message}` });
-    }
-  });
-
-  // Rende la cartella 'uploads' accessibile pubblicamente via browser
-  app.use("/uploads", express.static(UPLOAD_ROOT));
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createServer({

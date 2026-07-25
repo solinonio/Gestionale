@@ -400,57 +400,6 @@ export const initializeDefaultUsers = async (): Promise<void> => {
   }
 };
 
-export const uploadAttachment = async (file: File, type: 'client' | 'quotation', id: string, originalPath?: string) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (originalPath) {
-        formData.append('originalPath', originalPath);
-    }
-    const response = await fetch(`/api/upload/${type}/${id}`, {
-        method: 'POST',
-        body: formData
-    });
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to upload attachment: ${response.statusText}`);
-    }
-    return response.json();
-};
-
-export const addAttachmentLink = async (path: string, type: 'client' | 'quotation', id: string) => {
-  const response = await fetch('/api/attachments/link', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path, type, id })
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Errore durante il salvataggio del link');
-  }
-  return response.json();
-};
-
-export const getAttachments = async (type: 'client' | 'quotation', id: string) => {
-    const response = await fetch(`/api/attachments/${type}/${id}`);
-    if (!response.ok) {
-        throw new Error(`Failed to get attachments: ${response.statusText}`);
-    }
-    const data = await response.json();
-    return data.attachments;
-};
-
-export const downloadAttachment = async (id: string) => {
-    window.open(`/api/attachments/download/${id}`, '_blank');
-};
-
-export const deleteAttachment = async (id: string) => {
-    const response = await fetch(`/api/attachments/${id}`, { method: 'DELETE' });
-    if (!response.ok) {
-        throw new Error(`Failed to delete attachment: ${response.statusText}`);
-    }
-    return response.json();
-};
-
 // Invoice Helpers
 export const getInvoices = async (): Promise<Invoice[]> => {
   await syncWithServer();

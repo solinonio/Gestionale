@@ -16,16 +16,6 @@ export interface CompanyInfo {
   conditionsText: string;
 }
 
-export interface ClientAttachment {
-  id: string;
-  path: string;
-  filename: string;
-  date: string;
-  progressive: string;
-  amount: number;
-  createdAt: string;
-}
-
 export interface Client {
   id: string;
   name: string;
@@ -37,11 +27,6 @@ export interface Client {
   city?: string;
   vatNumber?: string;
   sdiCode?: string;
-  attachmentPath?: string;
-  attachmentDate?: string;
-  attachmentProgressive?: string;
-  attachmentAmount?: number;
-  attachments?: any[];
 }
 
 export type CostCategory = 'MATERIAL' | 'LABOR';
@@ -87,8 +72,6 @@ export interface Quotation {
   collaudo?: 'incluso' | 'non incluso' | null;
   validita?: string;
   isImported?: boolean;
-  attachment?: string;
-  attachmentsList?: string[];
 }
 
 export interface InvoiceLine {
