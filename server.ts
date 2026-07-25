@@ -1168,30 +1168,35 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
       try {
         // 1. Prova il formato array sotto la chiave 'clients'
         const [legacyArray]: any = await connection.query("SELECT `value` FROM app_store WHERE `key` = 'clients'");
-        if (legacyArray.length > 0) {
-          const clients = JSON.parse(legacyArray[0].value);
-          if (Array.isArray(clients)) {
-            for (const c of clients) {
-              if (!c.id) continue;
-              await connection.query(
-                `INSERT INTO Anagrafiche_Clienti 
-                 (\`id\`, \`name\`, \`intestazione\`, \`email\`, \`phone\`, \`address\`, \`cap\`, \`city\`, \`vatNumber\`, \`sdiCode\`, \`json_data\`) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE 
-                 \`name\` = VALUES(\`name\`), \`json_data\` = VALUES(\`json_data\`)`,
-                [c.id, c.name || "", c.intestazione || "", c.email || "", c.phone || "", c.address || "", c.cap || "", c.city || "", c.vatNumber || "", c.sdiCode || "", JSON.stringify(c)]
-              );
-              migratedCount++;
+        if (legacyArray.length > 0 && legacyArray[0].value) {
+          try {
+            const clients = JSON.parse(legacyArray[0].value);
+            if (Array.isArray(clients)) {
+              for (const c of clients) {
+                if (!c || typeof c !== 'object' || !c.id) continue;
+                await connection.query(
+                  `INSERT INTO Anagrafiche_Clienti 
+                   (\`id\`, \`name\`, \`intestazione\`, \`email\`, \`phone\`, \`address\`, \`cap\`, \`city\`, \`vatNumber\`, \`sdiCode\`, \`json_data\`) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON DUPLICATE KEY UPDATE 
+                   \`name\` = VALUES(\`name\`), \`json_data\` = VALUES(\`json_data\`)`,
+                  [c.id, c.name || "", c.intestazione || "", c.email || "", c.phone || "", c.address || "", c.cap || "", c.city || "", c.vatNumber || "", c.sdiCode || "", JSON.stringify(c)]
+                );
+                migratedCount++;
+              }
             }
+          } catch (jsonErr: any) {
+            console.warn("[API] Errore parsing record 'clients' (array):", jsonErr.message);
           }
         }
 
         // 2. Prova il formato individuale 'client:%'
         const [legacyIndividual]: any = await connection.query("SELECT `value` FROM app_store WHERE `key` LIKE 'client:%'");
         for (const row of legacyIndividual) {
+          if (!row.value) continue;
           try {
             const c = JSON.parse(row.value);
-            if (!c.id) continue;
+            if (!c || typeof c !== 'object' || !c.id) continue;
             await connection.query(
               `INSERT INTO Anagrafiche_Clienti 
                (\`id\`, \`name\`, \`intestazione\`, \`email\`, \`phone\`, \`address\`, \`cap\`, \`city\`, \`vatNumber\`, \`sdiCode\`, \`json_data\`) 
@@ -1201,8 +1206,8 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
               [c.id, c.name || "", c.intestazione || "", c.email || "", c.phone || "", c.address || "", c.cap || "", c.city || "", c.vatNumber || "", c.sdiCode || "", JSON.stringify(c)]
             );
             migratedCount++;
-          } catch (e) {
-            console.warn("[API] Errore parsing record individuale client:", row.key);
+          } catch (e: any) {
+            console.warn("[API] Errore parsing record individuale client:", row.key, e.message);
           }
         }
 
