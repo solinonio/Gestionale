@@ -8,7 +8,10 @@ import {
   Plus,
   Settings,
   HardDrive,
-  X
+  X,
+  Download,
+  FileText,
+  Eye
 } from 'lucide-react';
 import { getAttachments, deleteAttachment, addAttachmentLink } from '../lib/db';
 
@@ -37,7 +40,6 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [nasRoot, setNasRoot] = useState(localStorage.getItem('nas_root_path') || '\\\\NAS\\Upload\\');
-  const [showConfig, setShowConfig] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -65,7 +67,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
     if (!files || files.length === 0) return;
     
     if (id === 'new') {
-      alert("Salva prima l'elemento per poter aggiungere allegati.");
+      alert("Salva prima il preventivo per poter aggiungere allegati.");
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -81,20 +83,21 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fullPath = `${root}${file.name}`;
+        // SALVIAMO SOLO IL PERCORSO (LINK), NON CARICHIAMO IL FILE
         await addAttachmentLink(fullPath, type, id);
       }
       
       await loadAttachments();
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
-      setError(err.message || "Errore durante l'aggiunta");
+      setError(err.message || "Errore durante il collegamento");
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (attachmentId: string) => {
-    if (!confirm("Rimuovere questo link?")) return;
+    if (!confirm("Rimuovere questo collegamento?")) return;
     try {
       await deleteAttachment(attachmentId);
       await loadAttachments();
@@ -117,7 +120,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
       <div className="flex items-center justify-between border-b border-gray-100 pb-3">
         <h4 className="text-[12px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-2">
           <Paperclip size={16} />
-          {title}
+          {title} ({attachments.length})
         </h4>
         <div className="flex items-center gap-2">
            {loading && <Loader2 size={14} className="animate-spin text-blue-600" />}
@@ -127,7 +130,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
            >
              <Plus size={16} />
-             SELEZIONA FILE DAL PC / NAS
+             COLLEGA FILE DAL PC / NAS
            </button>
            <input 
              type="file" 
@@ -143,7 +146,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
         <div className="flex items-center justify-between mb-2">
           <label className="text-[10px] font-bold text-orange-800 uppercase flex items-center gap-1">
             <Settings size={12} />
-            Cartella di Origine (NAS o Locale)
+            Percorso Radice (NAS o Cartella Locale)
           </label>
         </div>
         <input 
@@ -157,7 +160,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
           placeholder="Esempio: \\NAS\Preventivi\  oppure  C:\Lavori\"
         />
         <p className="text-[9px] text-orange-600 mt-2 italic leading-tight">
-          * Il sistema userà questa cartella come base. Se selezioni un file, aggiungerà il suo nome a questo percorso automaticamente.
+          * Quando scegli un file, il sistema aggiungerà il suo nome a questo percorso e lo salverà come link nel database.
         </p>
       </div>
 
@@ -174,7 +177,7 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
                     <span className="text-[12px] font-bold text-gray-900 truncate max-w-[300px]">
                       {att.nome_originale.split('\\').pop()?.split('/').pop()}
                     </span>
-                    <span className="text-[9px] text-gray-400 uppercase font-bold tracking-tighter">
+                    <span className="text-[9px] text-orange-600 uppercase font-bold tracking-tighter">
                       Link salvato nel Database
                     </span>
                   </div>
@@ -182,42 +185,46 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => {
-                      navigator.clipboard.writeText(att.nome_originale);
-                      alert("PERCORSO COPIATO!\n\nOra puoi incollarlo in una cartella o su 'Esegui' (Win+R) per aprire il file.");
+                      window.open(`/api/attachments/preview/${att.id}`, '_blank');
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded-lg text-[10px] font-bold transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded-lg text-[10px] font-bold transition-all"
+                  >
+                    <Eye size={14} />
+                    ANTEPRIMA
+                  </button>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(att.nome_originale);
+                      alert("PERCORSO COPIATO!\n\nIncollalo in una cartella per aprire il file.");
+                    }}
+                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors border border-transparent hover:border-green-100"
+                    title="Copia Percorso"
                   >
                     <ExternalLink size={14} />
-                    COPIA PERCORSO
                   </button>
                   <button 
                     onClick={() => handleDelete(att.id)}
                     className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Rimuovi"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
               </div>
-              <div className="bg-gray-50 p-2.5 rounded-md border border-gray-100 flex items-center justify-between gap-2">
-                <p className="text-[11px] font-mono text-gray-600 break-all leading-tight select-all flex-1">
+              <div className="bg-gray-50 p-2.5 rounded-md border border-gray-100">
+                <p className="text-[11px] font-mono text-gray-600 break-all leading-tight select-all">
                   {att.nome_originale}
                 </p>
-                <div className="text-[10px] text-gray-400 font-bold whitespace-nowrap bg-white px-2 py-0.5 rounded border border-gray-100">
-                  LINK NAS
-                </div>
               </div>
             </div>
           ))
         ) : (
           <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
             <Paperclip size={32} className="mx-auto text-gray-300 mb-3 opacity-40" />
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Nessun allegato collegato</p>
-            <p className="text-[10px] text-gray-400 mt-2">Usa il pulsante in alto per aggiungere un link ai tuoi file locali.</p>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Nessun collegamento</p>
+            <p className="text-[10px] text-gray-400 mt-2">Usa il pulsante in alto per collegare i tuoi file.</p>
           </div>
         )}
       </div>
     </div>
   );
-
 };

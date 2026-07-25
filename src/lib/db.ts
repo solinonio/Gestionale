@@ -400,9 +400,12 @@ export const initializeDefaultUsers = async (): Promise<void> => {
   }
 };
 
-export const uploadAttachment = async (file: File, type: 'client' | 'quotation', id: string) => {
+export const uploadAttachment = async (file: File, type: 'client' | 'quotation', id: string, originalPath?: string) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (originalPath) {
+        formData.append('originalPath', originalPath);
+    }
     const response = await fetch(`/api/upload/${type}/${id}`, {
         method: 'POST',
         body: formData

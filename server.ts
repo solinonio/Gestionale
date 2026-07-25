@@ -1398,19 +1398,22 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     console.log("Upload request received:", req.params);
     try {
       const { type, id } = req.params;
+      const { originalPath } = req.body;
       const file = req.file;
-      console.log("File received:", file);
+      console.log("File received:", file, "Original path:", originalPath);
       if (!file) return res.status(400).json({ success: false, error: "Nessun file caricato" });
       
       const config = getDbConfig();
       // Store relative path for portability
       const relativePath = path.relative(UPLOAD_ROOT, file.path);
       
+      const displayName = originalPath || file.originalname;
+      
       const insertQuery = type === 'client' 
         ? "INSERT INTO allegati_clienti (cliente_id, nome_file, nome_originale, percorso_file, dimensione) VALUES (?, ?, ?, ?, ?)"
         : "INSERT INTO allegati_preventivi (preventivo_id, nome_file, nome_originale, percorso_file, dimensione) VALUES (?, ?, ?, ?, ?)";
       
-      const insertParams = [id, file.filename, file.originalname, relativePath, file.size];
+      const insertParams = [id, file.filename, displayName, relativePath, file.size];
 
       let insertedId = null;
       if (config.dbType === 'mariadb') {
@@ -1423,7 +1426,16 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
         let meta: any = {};
         if (fs.existsSync(attachmentsPath)) meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
         insertedId = crypto.randomUUID();
-        meta[insertedId] = { type, id, ...file, path: relativePath, data_caricamento: new Date() };
+        meta[insertedId] = { 
+          id: insertedId,
+          type, 
+          parentId: id, 
+          nome_file: file.filename,
+          nome_originale: displayName,
+          percorso_file: relativePath,
+          dimensione: file.size,
+          data_caricamento: new Date().toISOString()
+        };
         fs.writeFileSync(attachmentsPath, JSON.stringify(meta, null, 2), "utf-8");
       }
 
@@ -1884,6 +1896,44 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
 
   // Rende la cartella 'uploads' accessibile pubblicamente via browser
   app.use("/uploads", express.static(UPLOAD_ROOT));
+
+  // API per visualizzare un file locale/NAS (funziona se il server ha accesso al percorso)
+  app.get("/api/attachments/preview/:id", (req, res) => {
+    try {
+      const { id } = req.params;
+      const config = getDbConfig();
+      let attachment: any = null;
+
+      if (config.dbType === 'mariadb') {
+        // Logica per MariaDB (semplificata)
+      } else {
+        const attachmentsPath = path.join(process.cwd(), "attachments_meta.json");
+        if (fs.existsSync(attachmentsPath)) {
+          const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
+          attachment = meta[id];
+        }
+      }
+
+      if (!attachment) return res.status(404).send("Allegato non trovato");
+
+      const filePath = attachment.nome_originale; // Il percorso completo salvato (es: \\NAS\...)
+
+      if (fs.existsSync(filePath)) {
+        res.sendFile(filePath);
+      } else {
+        // Proviamo a vedere se è un percorso relativo agli upload del server
+        const absolutePath = path.resolve(UPLOAD_ROOT, attachment.percorso_file || '');
+        if (fs.existsSync(absolutePath)) {
+          res.sendFile(absolutePath);
+        } else {
+          res.status(404).send(`File non trovato. Il server non può raggiungere: ${filePath}`);
+        }
+      }
+    } catch (error) {
+      console.error("Errore anteprima:", error);
+      res.status(500).send("Errore durante l'apertura del file");
+    }
+  });
 
   if (process.env.NODE_ENV !== "production") {
     const vite = await createServer({
