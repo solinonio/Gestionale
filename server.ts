@@ -1489,26 +1489,40 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
         
         let relativeFilePath = "";
         let originalName = "";
+        let isManualLink = false;
 
         if (config.dbType === 'mariadb') {
             const pool = await getMariaPool(config);
-            const [rows]: any = await pool.query("SELECT percorso_file, nome_originale FROM allegati_clienti WHERE id = ? UNION SELECT percorso_file, nome_originale FROM allegati_preventivi WHERE id = ?", [id, id]);
+            const [rows]: any = await pool.query(
+                "SELECT percorso_file, nome_originale, nome_file FROM allegati_clienti WHERE id = ? UNION SELECT percorso_file, nome_originale, nome_file FROM allegati_preventivi WHERE id = ?", 
+                [id, id]
+            );
             if (rows.length === 0) return res.status(404).json({ success: false, error: "File non trovato" });
             relativeFilePath = rows[0].percorso_file;
             originalName = rows[0].nome_originale;
+            isManualLink = rows[0].nome_file === 'manual_link';
         } else {
             const attachmentsPath = path.join(path.dirname(getDbPath()), 'attachments_meta.json');
             const meta = JSON.parse(fs.readFileSync(attachmentsPath, "utf-8"));
             const entry = meta[id];
             if (!entry) return res.status(404).json({ success: false, error: "File non trovato" });
-            relativeFilePath = entry.path;
-            originalName = entry.originalname;
+            relativeFilePath = entry.percorso_file || entry.path;
+            originalName = entry.nome_originale || entry.originalname;
+            isManualLink = entry.nome_file === 'manual_link';
+        }
+
+        if (isManualLink) {
+            return res.status(400).json({ 
+                success: false, 
+                error: "Questo è un collegamento a un file locale o NAS. Copia il percorso e incollalo in una cartella per aprirlo.",
+                path: relativeFilePath
+            });
         }
         
         const absolutePath = path.isAbsolute(relativeFilePath) ? relativeFilePath : path.join(UPLOAD_ROOT, relativeFilePath);
         
         if (!fs.existsSync(absolutePath)) {
-            return res.status(404).json({ success: false, error: "File fisico non trovato sul server" });
+            return res.status(404).json({ success: false, error: "File fisico non trovato sul server. Potrebbe essere stato rimosso o spostato." });
         }
 
         res.download(absolutePath, originalName);

@@ -105,11 +105,19 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
     setUploading(true);
     setError(null);
     try {
+      let root = nasRoot.trim();
+      if (isNasMode && root) {
+        // Assicura che il percorso termini con un separatore
+        if (!root.endsWith('\\') && !root.endsWith('/')) {
+          root += root.includes('/') ? '/' : '\\';
+        }
+      }
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (isNasMode) {
           // Modalità NAS Automatica: non carica il file, salva solo il percorso
-          const fullPath = `${nasRoot}${file.name}`;
+          const fullPath = `${root}${file.name}`;
           await addAttachmentLink(fullPath, type, id);
         } else {
           // Modalità standard: carica il file sul server
@@ -318,12 +326,13 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
                   <button 
                     onClick={() => {
                       navigator.clipboard.writeText(att.nome_originale);
-                      alert("Percorso copiato negli appunti!");
+                      alert("Percorso copiato negli appunti!\nIncollalo in una cartella per aprire il file.");
                     }}
-                    className="p-1 text-orange-600 hover:bg-orange-50 rounded"
-                    title="Copia Percorso"
+                    className="p-1 text-orange-600 hover:bg-orange-50 rounded flex items-center gap-1"
+                    title="Copia Percorso NAS"
                   >
                     <ExternalLink size={14} />
+                    <span className="text-[8px] font-bold">COPIA</span>
                   </button>
                 ) : (
                   <button 
