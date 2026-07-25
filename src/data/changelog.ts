@@ -11,6 +11,26 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.7.0",
+    date: "2026-07-25",
+    title: "Gestionale v3.7.0 - Transizione MariaDB e Pulizia Sistema",
+    type: "minor",
+    changes: [
+      {
+        category: "improvement",
+        text: "Nuova Struttura Database: Migrazione completa delle anagrafiche clienti in una tabella MariaDB dedicata (Anagrafiche_Clienti) per massime prestazioni e affidabilità."
+      },
+      {
+        category: "improvement",
+        text: "Semplificazione Allegati: Rimosso il vecchio sistema di upload server e le dipendenze multer per favorire la gestione tramite NAS e link diretti."
+      },
+      {
+        category: "improvement",
+        text: "Revisione Interfaccia: Rimossi riferimenti a icone e pulsanti obsoleti per allegati caricati localmente."
+      }
+    ]
+  },
+  {
     version: "3.6.4",
     date: "2026-07-24",
     title: "Gestionale v3.6.4 - Gestione Allegati Server Robustizzata",

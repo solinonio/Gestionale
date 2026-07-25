@@ -8,7 +8,6 @@ import {
   FileText, 
   FileCheck2, 
   Users,
-  Paperclip,
   Trash2,
   Eye,
   Loader2,

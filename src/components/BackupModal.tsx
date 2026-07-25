@@ -74,7 +74,6 @@ export default function BackupModal({ isOpen, onClose, onBackupSuccess }: Props)
   const [browseDrives, setBrowseDrives] = useState<string[]>([]);
   const [browseLoading, setBrowseLoading] = useState(false);
   const [browseError, setBrowseError] = useState<string | null>(null);
-  const [isExportingUploads, setIsExportingUploads] = useState(false);
   const [isReloading, setIsReloading] = useState(false);
   const [diagnosticResult, setDiagnosticResult] = useState<{
     run: boolean;
@@ -356,38 +355,6 @@ export default function BackupModal({ isOpen, onClose, onBackupSuccess }: Props)
     }
   };
 
-  const handleExportUploads = async () => {
-    try {
-      setIsExportingUploads(true);
-      setStatusMsg({ type: null, text: '' });
-      
-      const response = await fetch('/api/export-uploads');
-      if (!response.ok) {
-        throw new Error(`Errore server: ${response.status} ${response.statusText}`);
-      }
-      
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `gestionale_preventivi_uploads_${new Date().toISOString().split('T')[0]}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      setStatusMsg({
-        type: 'success',
-        text: 'Cartella allegati (uploads) esportata correttamente come file ZIP! Controlla i tuoi download.'
-      });
-    } catch (e: any) {
-      console.error(e);
-      setStatusMsg({ type: 'error', text: `Errore durante l'esportazione degli allegati: ${e.message}` });
-    } finally {
-      setIsExportingUploads(false);
-    }
-  };
-
   // Local JSON or SQL Backup Import
   const handleLocalImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -591,26 +558,6 @@ export default function BackupModal({ isOpen, onClose, onBackupSuccess }: Props)
                 <span className="text-[10px] text-gray-400">
                   {dbType === 'mariadb' ? 'Scarica dump SQL MariaDB' : 'Scarica file JSON di backup'}
                 </span>
-              </div>
-            </button>
-
-            {/* Export Uploads ZIP */}
-            <button
-              type="button"
-              onClick={handleExportUploads}
-              disabled={isExportingUploads}
-              className="flex flex-col items-center justify-center p-5 bg-gray-950/50 hover:bg-gray-850 border border-gray-800 hover:border-gray-700 rounded-xl transition-all text-center space-y-3 group disabled:opacity-50"
-            >
-              <div className="p-3 bg-amber-950/40 border border-amber-900/60 rounded-xl text-amber-400 group-hover:scale-110 transition-transform">
-                {isExportingUploads ? (
-                  <RefreshCw size={22} className="animate-spin text-amber-400" />
-                ) : (
-                  <FolderDown size={22} />
-                )}
-              </div>
-              <div>
-                <span className="block text-xs font-bold text-white">Esporta Allegati</span>
-                <span className="text-[10px] text-gray-400">Scarica cartella uploads ZIP</span>
               </div>
             </button>
 

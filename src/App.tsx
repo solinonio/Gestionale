@@ -287,8 +287,15 @@ export default function App() {
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold text-white tracking-tight leading-none">Gestionale</h1>
-                <span className="bg-gray-800 text-gray-300 text-[10px] font-mono px-1.5 py-0.5 rounded border border-gray-700 select-none">
+                <button 
+                  onClick={() => setIsChangelogOpen(true)}
+                  className="bg-gray-800 text-gray-300 hover:text-white hover:border-gray-500 text-[10px] font-mono px-1.5 py-0.5 rounded border border-gray-700 select-none cursor-pointer transition-colors"
+                  title="Clicca per vedere le novità della versione 3.7.0"
+                >
                   v{CURRENT_VERSION}
+                </button>
+                <span className="bg-blue-900/40 text-blue-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-800/50 select-none uppercase tracking-tighter">
+                  REV. 174
                 </span>
                 {remoteSoftwareVersion && (
                   <button

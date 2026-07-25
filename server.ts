@@ -5,6 +5,7 @@ import fs from "fs";
 import crypto from "crypto";
 import os from "os";
 import mysql from "mysql2/promise";
+import { escape } from "mysql2";
 import { GoogleGenAI, Type } from "@google/genai";
 import AdmZip from 'adm-zip';
 
@@ -926,7 +927,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
       if (appStoreRows.length > 0) {
         sqlDump += `INSERT INTO \`app_store\` (\`key\`, \`value\`) VALUES\n`;
         const values = appStoreRows.map((row: any) => {
-          return `(${pool.escape(row.key)}, ${pool.escape(row.value)})`;
+          return `(${escape(row.key)}, ${escape(row.value)})`;
         });
         sqlDump += values.join(",\n") + ";\n\n";
       }
@@ -948,53 +949,57 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
       if (prevRows.length > 0) {
         sqlDump += `INSERT INTO \`preventivi\` (\`id\`, \`numero\`, \`anno\`, \`data\`, \`cliente\`, \`totale\`, \`json_data\`) VALUES\n`;
         const values = prevRows.map((row: any) => {
-          return `(${pool.escape(row.id)}, ${pool.escape(row.numero)}, ${row.anno}, ${pool.escape(row.data)}, ${pool.escape(row.cliente)}, ${row.totale}, ${pool.escape(row.json_data)})`;
+          return `(${escape(row.id)}, ${escape(row.numero)}, ${row.anno}, ${escape(row.data)}, ${escape(row.cliente)}, ${row.totale}, ${escape(row.json_data)})`;
         });
         sqlDump += values.join(",\n") + ";\n\n";
       }
 
-      // 3. allegati_clienti
-      sqlDump += `-- Tabella: allegati_clienti\n`;
-      sqlDump += `DROP TABLE IF EXISTS \`allegati_clienti\`;\n`;
-      sqlDump += `CREATE TABLE \`allegati_clienti\` (\n`;
-      sqlDump += `  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n`;
-      sqlDump += `  \`cliente_id\` VARCHAR(100) NOT NULL,\n`;
-      sqlDump += `  \`nome_file\` VARCHAR(255) NOT NULL,\n`;
-      sqlDump += `  \`nome_originale\` VARCHAR(255) NOT NULL,\n`;
-      sqlDump += `  \`percorso_file\` VARCHAR(255) NOT NULL,\n`;
-      sqlDump += `  \`dimensione\` INT NOT NULL,\n`;
-      sqlDump += `  \`data_caricamento\` DATETIME DEFAULT CURRENT_TIMESTAMP\n`;
+      // 3. Materiali
+      sqlDump += `-- Tabella: Materiali\n`;
+      sqlDump += `DROP TABLE IF EXISTS \`Materiali\`;\n`;
+      sqlDump += `CREATE TABLE \`Materiali\` (\n`;
+      sqlDump += `  \`id\` VARCHAR(100) PRIMARY KEY,\n`;
+      sqlDump += `  \`nome\` VARCHAR(255) NOT NULL,\n`;
+      sqlDump += `  \`fornitore\` VARCHAR(255),\n`;
+      sqlDump += `  \`prezzoLastra\` DECIMAL(15,2),\n`;
+      sqlDump += `  \`linkSchedaTecnica\` TEXT,\n`;
+      sqlDump += `  \`lunghezza\` DECIMAL(15,2),\n`;
+      sqlDump += `  \`larghezza\` DECIMAL(15,2),\n`;
+      sqlDump += `  \`spessore\` DECIMAL(15,2),\n`;
+      sqlDump += `  \`json_data\` LONGTEXT NOT NULL\n`;
       sqlDump += `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n\n`;
 
-      const [allClientiRows]: any = await pool.query("SELECT * FROM allegati_clienti");
-      if (allClientiRows.length > 0) {
-        sqlDump += `INSERT INTO \`allegati_clienti\` (\`id\`, \`cliente_id\`, \`nome_file\`, \`nome_originale\`, \`percorso_file\`, \`dimensione\`, \`data_caricamento\`) VALUES\n`;
-        const values = allClientiRows.map((row: any) => {
-          const dateStr = row.data_caricamento ? new Date(row.data_caricamento).toISOString().slice(0, 19).replace('T', ' ') : 'CURRENT_TIMESTAMP';
-          return `(${row.id}, ${pool.escape(row.cliente_id)}, ${pool.escape(row.nome_file)}, ${pool.escape(row.nome_originale)}, ${pool.escape(row.percorso_file)}, ${row.dimensione}, ${pool.escape(dateStr)})`;
+      const [matRows]: any = await pool.query("SELECT * FROM Materiali");
+      if (matRows.length > 0) {
+        sqlDump += `INSERT INTO \`Materiali\` (\`id\`, \`nome\`, \`fornitore\`, \`prezzoLastra\`, \`linkSchedaTecnica\`, \`lunghezza\`, \`larghezza\`, \`spessore\`, \`json_data\`) VALUES\n`;
+        const values = matRows.map((row: any) => {
+          return `(${escape(row.id)}, ${escape(row.nome)}, ${escape(row.fornitore)}, ${row.prezzoLastra}, ${escape(row.linkSchedaTecnica)}, ${row.lunghezza}, ${row.larghezza}, ${row.spessore}, ${escape(row.json_data)})`;
         });
         sqlDump += values.join(",\n") + ";\n\n";
       }
 
-      // 4. allegati_preventivi
-      sqlDump += `-- Tabella: allegati_preventivi\n`;
-      sqlDump += `DROP TABLE IF EXISTS \`allegati_preventivi\`;\n`;
-      sqlDump += `CREATE TABLE \`allegati_preventivi\` (\n`;
-      sqlDump += `  \`id\` INT AUTO_INCREMENT PRIMARY KEY,\n`;
-      sqlDump += `  \`preventivo_id\` VARCHAR(100) NOT NULL,\n`;
-      sqlDump += `  \`nome_file\` VARCHAR(255) NOT NULL,\n`;
-      sqlDump += `  \`nome_originale\` VARCHAR(255) NOT NULL,\n`;
-      sqlDump += `  \`percorso_file\` VARCHAR(255) NOT NULL,\n`;
-      sqlDump += `  \`dimensione\` INT NOT NULL,\n`;
-      sqlDump += `  \`data_caricamento\` DATETIME DEFAULT CURRENT_TIMESTAMP\n`;
+      // 4. Anagrafiche_Clienti
+      sqlDump += `-- Tabella: Anagrafiche_Clienti\n`;
+      sqlDump += `DROP TABLE IF EXISTS \`Anagrafiche_Clienti\`;\n`;
+      sqlDump += `CREATE TABLE \`Anagrafiche_Clienti\` (\n`;
+      sqlDump += `  \`id\` VARCHAR(100) PRIMARY KEY,\n`;
+      sqlDump += `  \`name\` VARCHAR(255) NOT NULL,\n`;
+      sqlDump += `  \`intestazione\` VARCHAR(255),\n`;
+      sqlDump += `  \`email\` VARCHAR(255),\n`;
+      sqlDump += `  \`phone\` VARCHAR(100),\n`;
+      sqlDump += `  \`address\` TEXT,\n`;
+      sqlDump += `  \`cap\` VARCHAR(20),\n`;
+      sqlDump += `  \`city\` VARCHAR(100),\n`;
+      sqlDump += `  \`vatNumber\` VARCHAR(100),\n`;
+      sqlDump += `  \`sdiCode\` VARCHAR(50),\n`;
+      sqlDump += `  \`json_data\` LONGTEXT NOT NULL\n`;
       sqlDump += `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n\n`;
 
-      const [allPrevRows]: any = await pool.query("SELECT * FROM allegati_preventivi");
-      if (allPrevRows.length > 0) {
-        sqlDump += `INSERT INTO \`allegati_preventivi\` (\`id\`, \`preventivo_id\`, \`nome_file\`, \`nome_originale\`, \`percorso_file\`, \`dimensione\`, \`data_caricamento\`) VALUES\n`;
-        const values = allPrevRows.map((row: any) => {
-          const dateStr = row.data_caricamento ? new Date(row.data_caricamento).toISOString().slice(0, 19).replace('T', ' ') : 'CURRENT_TIMESTAMP';
-          return `(${row.id}, ${pool.escape(row.preventivo_id)}, ${pool.escape(row.nome_file)}, ${pool.escape(row.nome_originale)}, ${pool.escape(row.percorso_file)}, ${row.dimensione}, ${pool.escape(dateStr)})`;
+      const [clientRows]: any = await pool.query("SELECT * FROM Anagrafiche_Clienti");
+      if (clientRows.length > 0) {
+        sqlDump += `INSERT INTO \`Anagrafiche_Clienti\` (\`id\`, \`name\`, \`intestazione\`, \`email\`, \`phone\`, \`address\`, \`cap\`, \`city\`, \`vatNumber\`, \`sdiCode\`, \`json_data\`) VALUES\n`;
+        const values = clientRows.map((row: any) => {
+          return `(${escape(row.id)}, ${escape(row.name)}, ${escape(row.intestazione)}, ${escape(row.email)}, ${escape(row.phone)}, ${escape(row.address)}, ${escape(row.cap)}, ${escape(row.city)}, ${escape(row.vatNumber)}, ${escape(row.sdiCode)}, ${escape(row.json_data)})`;
         });
         sqlDump += values.join(",\n") + ";\n\n";
       }
@@ -1096,8 +1101,10 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
 
   // Endpoints to manage DB config (JSON NAS file or MariaDB connection)
   app.get("/api/db-config", (req, res) => {
+    console.log("[API] GET /api/db-config requested");
     try {
       const config = getDbConfig();
+      console.log("[API] Current config loaded from file:", JSON.stringify(config));
       const customPath = config.customPath || "";
       const dbType = config.dbType || "json";
       const mariadbConfig = config.mariadbConfig || {
@@ -1113,8 +1120,11 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
       let exists = false;
       try {
         exists = fs.existsSync(activePath);
-      } catch (e) {}
+      } catch (e) {
+        console.warn("[API] Error checking activePath existence:", e);
+      }
 
+      console.log("[API] db-config response preparing:", { dbType, activePath, exists });
       return res.json({
         success: true,
         dbType,
@@ -1126,6 +1136,7 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
         defaultPath: DEFAULT_DB_FILE_PATH
       });
     } catch (err: any) {
+      console.error("[API] Error in GET /api/db-config:", err);
       return res.status(500).json({ success: false, error: err.message });
     }
   });
@@ -1660,7 +1671,18 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
   }
   
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+    let version = "3.7.0";
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8"));
+      version = pkg.version;
+    } catch (e) {}
+    console.log(`[Server] Avviato con successo sulla porta ${PORT}`);
+    console.log(`[Server] Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`[Server] Versione Software: ${version}`);
   });
 }
-start();
+console.log("[Server] Avvio del processo start()...");
+start().catch(err => {
+  console.error("[Server] Errore fatale durante l'avvio:", err);
+  process.exit(1);
+});
