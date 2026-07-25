@@ -16,6 +16,15 @@ export interface CompanyInfo {
   conditionsText: string;
 }
 
+export interface Attachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  dataUrl: string;
+  uploadedAt: string;
+}
+
 export interface Client {
   id: string;
   name: string;
@@ -27,6 +36,7 @@ export interface Client {
   city?: string;
   vatNumber?: string;
   sdiCode?: string;
+  allegati?: Attachment[];
 }
 
 export type CostCategory = 'MATERIAL' | 'LABOR';
@@ -72,6 +82,7 @@ export interface Quotation {
   collaudo?: 'incluso' | 'non incluso' | null;
   validita?: string;
   isImported?: boolean;
+  allegati?: Attachment[];
 }
 
 export interface InvoiceLine {

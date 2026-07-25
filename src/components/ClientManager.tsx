@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { getClients, addClient, updateClient, getQuotationsByClient, deleteClient } from '../lib/db';
-import { Client, Quotation } from '../types';
-import { Plus, Search, Loader2, Trash2, Check } from 'lucide-react';
+import { Client, Quotation, Attachment } from '../types';
+import { Plus, Search, Loader2, Trash2, Check, Paperclip } from 'lucide-react';
 import QuotationForm from './QuotationForm';
+import AttachmentManager from './AttachmentManager';
 
 interface Props {
   initialSelectedClientId?: string | null;
@@ -43,7 +44,7 @@ export default function ClientManager({
     }
   };
 
-  const [clientForm, setClientForm] = useState<Omit<Client, 'id'>>({ name: '', intestazione: '', email: '', phone: '', address: '', cap: '', city: '', vatNumber: '', sdiCode: '' });
+  const [clientForm, setClientForm] = useState<Omit<Client, 'id'>>({ name: '', intestazione: '', email: '', phone: '', address: '', cap: '', city: '', vatNumber: '', sdiCode: '', allegati: [] });
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -174,7 +175,7 @@ export default function ClientManager({
     } else {
         await addClient(clientForm);
     }
-    setClientForm({ name: '', intestazione: '', email: '', phone: '', address: '', cap: '', city: '', vatNumber: '', sdiCode: '' });
+    setClientForm({ name: '', intestazione: '', email: '', phone: '', address: '', cap: '', city: '', vatNumber: '', sdiCode: '', allegati: [] });
     setShowForm(false);
     getClients().then(setClients);
   };
@@ -182,7 +183,7 @@ export default function ClientManager({
   const handleEditClient = (e: React.MouseEvent, client: Client) => {
     e.stopPropagation();
     setEditingClient(client);
-    setClientForm({ name: client.name, intestazione: client.intestazione || '', email: client.email, phone: client.phone, address: client.address, cap: client.cap, city: client.city, vatNumber: client.vatNumber, sdiCode: client.sdiCode });
+    setClientForm({ name: client.name, intestazione: client.intestazione || '', email: client.email, phone: client.phone, address: client.address, cap: client.cap, city: client.city, vatNumber: client.vatNumber, sdiCode: client.sdiCode, allegati: client.allegati || [] });
     setShowForm(true);
   }
 
@@ -324,6 +325,14 @@ export default function ClientManager({
           <input placeholder="P.IVA" className="p-2 border rounded bg-white text-gray-900" value={clientForm.vatNumber} onChange={e => setClientForm({...clientForm, vatNumber: e.target.value})} />
           <input placeholder="Codice Univoco" className="p-2 border rounded bg-white text-gray-900" value={clientForm.sdiCode} onChange={e => setClientForm({...clientForm, sdiCode: e.target.value})} />
           
+          <div className="col-span-2 pt-2 border-t border-gray-200 space-y-2">
+            <label className="block text-sm font-semibold text-gray-700">Allegati Cliente</label>
+            <AttachmentManager 
+              attachments={clientForm.allegati || []} 
+              onChange={atts => setClientForm({ ...clientForm, allegati: atts })} 
+            />
+          </div>
+
           <button type="submit" className="col-span-2 bg-green-600 text-white p-2 rounded hover:bg-green-700 cursor-pointer font-bold">{editingClient ? 'Aggiorna Cliente' : 'Salva Cliente'}</button>
         </form>
       )}
@@ -380,27 +389,39 @@ export default function ClientManager({
         </table>
       </div>
       {selectedClient && (
-          <div className="mt-8">
-              <h4 className="font-bold text-lg mb-4">Preventivi di {selectedClient.name || selectedClient.intestazione}</h4>
-              <button onClick={() => { setEditingQuotation(null); setIsCreating(true); }} className="text-blue-600 mb-2">+ Nuovo Preventivo</button>
-              <table className="w-full text-left border-collapse border border-gray-200">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="px-4 py-3 font-semibold text-gray-700">Preventivo</th>
-                      <th className="px-4 py-3 font-semibold text-gray-700">Data</th>
-                      <th className="px-4 py-3 font-semibold text-gray-700">Importo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                      {quotations.map((q, index) => (
-                          <tr key={`${q.id}-${index}`} onClick={() => { setEditingQuotation(q); setIsCreating(true); }} className="cursor-pointer hover:bg-blue-50 border-b border-gray-200">
-                              <td className="px-4 py-3">{q.number}/{q.year % 100}</td>
-                              <td className="px-4 py-3">{q.date}</td>
-                              <td className="px-4 py-3">€{q.totalAmount.toFixed(2)}</td>
-                          </tr>
-                      ))}
-                  </tbody>
-              </table>
+          <div className="mt-8 space-y-6">
+              <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
+                  <h4 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                    <Paperclip size={18} /> Allegati di {selectedClient.name || selectedClient.intestazione}
+                  </h4>
+                  <AttachmentManager
+                      attachments={selectedClient.allegati || []}
+                      readOnly={true}
+                  />
+              </div>
+
+              <div>
+                  <h4 className="font-bold text-lg mb-4">Preventivi di {selectedClient.name || selectedClient.intestazione}</h4>
+                  <button onClick={() => { setEditingQuotation(null); setIsCreating(true); }} className="text-blue-600 mb-2">+ Nuovo Preventivo</button>
+                  <table className="w-full text-left border-collapse border border-gray-200">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          <th className="px-4 py-3 font-semibold text-gray-700">Preventivo</th>
+                          <th className="px-4 py-3 font-semibold text-gray-700">Data</th>
+                          <th className="px-4 py-3 font-semibold text-gray-700">Importo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                          {quotations.map((q, index) => (
+                              <tr key={`${q.id}-${index}`} onClick={() => { setEditingQuotation(q); setIsCreating(true); }} className="cursor-pointer hover:bg-blue-50 border-b border-gray-200">
+                                  <td className="px-4 py-3">{q.number}/{q.year % 100}</td>
+                                  <td className="px-4 py-3">{q.date}</td>
+                                  <td className="px-4 py-3">€{q.totalAmount.toFixed(2)}</td>
+                              </tr>
+                          ))}
+                      </tbody>
+                  </table>
+              </div>
           </div>
       )}
 

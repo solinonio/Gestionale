@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { CompanyInfo, Client, Quotation, QuotationRow, InternalRow } from '../types';
-import { Plus, Save, FileText, Eye, EyeOff, Download, X, User, Zap, MessageSquare, Trash2, Loader2, Copy, Check, Settings } from 'lucide-react';
+import { CompanyInfo, Client, Quotation, QuotationRow, InternalRow, Attachment } from '../types';
+import { Plus, Save, FileText, Eye, EyeOff, Download, X, User, Zap, MessageSquare, Trash2, Loader2, Copy, Check, Settings, Paperclip } from 'lucide-react';
 import { getCompanyProfile, saveQuotation, getQuotations, updateQuotation, getClients, addClient } from '../lib/db';
 import QuillEditor from './QuillEditor';
 import ClientSelectorPopup from './ClientSelectorPopup';
 import PDFPreviewModal from './PDFPreviewModal';
+import AttachmentManager from './AttachmentManager';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Simulator from './Simulator';
@@ -44,12 +45,14 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
   const [quotationNumber, setQuotationNumber] = useState<string>('1');
   const [quotationYear, setQuotationYear] = useState<number>(new Date().getFullYear());
   const [quotationLetter, setQuotationLetter] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'anagrafica' | 'preventivo' | 'noteCliente' | 'noteInterne'>('anagrafica');
+  const [allegati, setAllegati] = useState<Attachment[]>([]);
+  const [activeTab, setActiveTab] = useState<'anagrafica' | 'preventivo' | 'noteCliente' | 'allegati' | 'noteInterne'>('anagrafica');
 // ...
   const tabs = [
       { id: 'anagrafica', label: 'Anagrafica', icon: <User size={16} /> },
       { id: 'preventivo', label: 'Preventivo', icon: <FileText size={16} /> },
       { id: 'noteCliente', label: 'Note Cliente', icon: <MessageSquare size={16} /> },
+      { id: 'allegati', label: `Allegati (${allegati.length})`, icon: <Paperclip size={16} /> },
       { id: 'noteInterne', label: 'Simulatore', icon: <Zap size={16} /> },
   ] as const;
 
@@ -498,6 +501,7 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
         setInternalRows(props.editingQuotation.internalRows || []);
         setNotes(props.editingQuotation.notes || '');
         setInternalNotes(props.editingQuotation.internalNotes || '');
+        setAllegati(props.editingQuotation.allegati || []);
         setShowTotal(props.editingQuotation.showTotal !== false);
         
         const rawNum = props.editingQuotation.number || '';
@@ -540,6 +544,7 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
         setValidita('');
         setForceQuotationNumber(false);
         setCustomTotal(null);
+        setAllegati([]);
         getQuotations().then(data => {
             const year = new Date().getFullYear();
             const sameYear = data.filter(q => q.year === year);
@@ -971,7 +976,8 @@ Ecco il testo del PDF da analizzare:
             trasporto,
             installazione,
             collaudo,
-            validita
+            validita,
+            allegati
         };
 
         if (props.editingQuotation && props.editingQuotation.id) {
@@ -1332,13 +1338,23 @@ Ecco il testo del PDF da analizzare:
             {activeTab === 'noteCliente' && (
                 <div className="bg-gray-100 p-6 rounded-lg shadow-sm border border-gray-300">
                   <div className='flex justify-end mb-2'>
-                      <button onClick={() => setActiveTab(null)} className="text-gray-700 hover:text-gray-900 text-sm">Chiudi</button>
+                      <button onClick={() => setActiveTab(null as any)} className="text-gray-700 hover:text-gray-900 text-sm">Chiudi</button>
                   </div>
                   <label className="block text-sm font-medium mb-1 text-gray-900">Note Cliente</label>
                   <QuillEditor 
                     value={notes} 
                     onChange={setNotes}
                   />
+                </div>
+            )}
+            {activeTab === 'allegati' && (
+                <div className="bg-gray-100 p-6 rounded-lg shadow-sm border border-gray-300 space-y-4">
+                  <div className='flex justify-end mb-2'>
+                      <button onClick={() => setActiveTab(null as any)} className="text-gray-700 hover:text-gray-900 text-sm">Chiudi</button>
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">Allegati Preventivo</h3>
+                  <p className="text-sm text-gray-600">Carica file, documenti o immagini di supporto per questo preventivo.</p>
+                  <AttachmentManager attachments={allegati} onChange={setAllegati} />
                 </div>
             )}
             {activeTab === 'noteInterne' && (
