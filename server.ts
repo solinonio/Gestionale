@@ -1538,12 +1538,18 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
       const absolutePath = path.isAbsolute(relativePath) ? relativePath : path.join(UPLOAD_ROOT, relativePath);
       if (fs.existsSync(absolutePath) && !fs.lstatSync(absolutePath).isDirectory()) {
         console.log("Serving local file:", absolutePath);
+        if (absolutePath.toLowerCase().endsWith('.pdf')) {
+          res.contentType('application/pdf');
+        }
         return res.sendFile(absolutePath);
       } 
       
       // 2. Prova come percorso NAS/Locale diretto
       if (fs.existsSync(originalPath) && !fs.lstatSync(originalPath).isDirectory()) {
         console.log("Serving NAS/Local file:", originalPath);
+        if (originalPath.toLowerCase().endsWith('.pdf')) {
+          res.contentType('application/pdf');
+        }
         return res.sendFile(originalPath);
       }
 

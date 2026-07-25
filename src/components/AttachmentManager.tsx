@@ -41,7 +41,34 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
   const [loading, setLoading] = useState(false);
   const [nasRoot, setNasRoot] = useState(localStorage.getItem('nas_root_path') || '\\\\NAS\\Upload\\');
   const [error, setError] = useState<string | null>(null);
+  const [isElectronActive, setIsElectronActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const checkBridge = async () => {
+      try {
+        const res = await fetch('http://localhost:4500/select-file'); 
+        setIsElectronActive(true);
+      } catch (e) {
+        setIsElectronActive(false);
+      }
+    };
+    checkBridge();
+    const interval = setInterval(checkBridge, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const openWithElectron = async (path: string) => {
+    try {
+      await fetch('http://localhost:4500/open-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: path })
+      });
+    } catch (err) {
+      alert("Errore: Assicurati che l'app Bridge sia aperta sul tuo computer.");
+    }
+  };
 
   useEffect(() => {
     if (id && id !== 'new') {
@@ -62,13 +89,80 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhysicalUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
     if (id === 'new') {
-      alert("Salva prima il preventivo per poter aggiungere allegati.");
+      alert("Salva prima il preventivo.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        const res = await fetch(`/api/upload/${type}/${id}`, {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || "Errore upload");
+        }
+      }
+      
+      await loadAttachments();
+    } catch (err: any) {
+      setError(err.message || "Errore durante l'upload");
+    } finally {
+      setLoading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleElectronBrowse = async () => {
+    if (!isElectronActive) return;
+    
+    setLoading(true);
+    try {
+      const selectRes = await fetch('http://localhost:4500/select-file');
+      const fileData = await selectRes.json();
+      
+      if (fileData.canceled) {
+        setLoading(false);
+        return;
+      }
+
+      await fetch('/api/attachments/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: fileData.path,
+          type,
+          id
+        })
+      });
+
+      await loadAttachments();
+    } catch (err) {
+      setError("Errore comunicazione con Bridge Electron");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManualLink = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    if (id === 'new') {
+      alert("Salva prima il preventivo.");
       return;
     }
 
@@ -121,24 +215,62 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
         <h4 className="text-[12px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-2">
           <Paperclip size={16} />
           {title} ({attachments.length})
+          <span className={`flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full lowercase tracking-normal font-medium ${isElectronActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+            <div className={`w-1.5 h-1.5 rounded-full ${isElectronActive ? 'bg-green-500' : 'bg-gray-400'}`} />
+            bridge: {isElectronActive ? 'attivo' : 'offline'}
+          </span>
         </h4>
         <div className="flex items-center gap-2">
            {loading && <Loader2 size={14} className="animate-spin text-blue-600" />}
-           <button 
-             onClick={() => fileInputRef.current?.click()}
-             disabled={loading}
-             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
-           >
-             <Plus size={16} />
-             COLLEGA FILE DAL PC / NAS
-           </button>
+           
            <input 
              type="file" 
              ref={fileInputRef}
-             onChange={handleFileSelect}
+             onChange={handleManualLink}
              className="hidden" 
              multiple
            />
+
+           <input 
+             type="file" 
+             id="physical-upload"
+             onChange={handlePhysicalUpload}
+             className="hidden" 
+           />
+
+           <div className="flex bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+             <button 
+               onClick={() => document.getElementById('physical-upload')?.click()}
+               disabled={loading}
+               className="flex items-center gap-1.5 px-3 py-2 hover:bg-gray-50 text-blue-600 text-[10px] font-bold border-r border-gray-100 transition-all disabled:opacity-50"
+               title="Carica il file fisicamente sul server"
+             >
+               <Plus size={14} />
+               CARICA SUL SERVER
+             </button>
+             
+             <button 
+               onClick={() => fileInputRef.current?.click()}
+               disabled={loading}
+               className="flex items-center gap-1.5 px-3 py-2 hover:bg-gray-50 text-orange-600 text-[10px] font-bold border-r border-gray-100 transition-all disabled:opacity-50"
+               title="Collega un file usando il percorso radice impostato sotto"
+             >
+               <Link size={14} />
+               LINK MANUALE
+             </button>
+
+             {isElectronActive && (
+               <button 
+                 onClick={handleElectronBrowse}
+                 disabled={loading}
+                 className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] font-bold transition-all disabled:opacity-50"
+                 title="Sfoglia file sul NAS usando Electron"
+               >
+                 <HardDrive size={14} />
+                 SFOGLIA NAS
+               </button>
+             )}
+           </div>
         </div>
       </div>
 
@@ -191,11 +323,24 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
                         window.open(`/api/attachment-preview/${att.id}`, '_blank');
                       }
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded-lg text-[10px] font-bold transition-all"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                      att.nome_file === 'manual_link' && isElectronActive
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100' 
+                        : 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                    }`}
                   >
                     <Eye size={14} />
-                    APRI FILE
+                    {att.nome_file === 'manual_link' && isElectronActive ? 'APRI LOCALE' : 'ANTEPRIMA'}
                   </button>
+                  
+                  <button 
+                    onClick={() => window.open(`/api/attachments/download/${att.id}`, '_blank')}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+                    title="Scarica file"
+                  >
+                    <Download size={14} />
+                  </button>
+
                   <button 
                     onClick={() => {
                       navigator.clipboard.writeText(att.nome_originale);
