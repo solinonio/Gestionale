@@ -289,10 +289,11 @@ export default function App() {
                 <h1 className="text-xl font-bold text-white tracking-tight leading-none">Gestionale</h1>
                 <button 
                   onClick={() => setIsChangelogOpen(true)}
-                  className="bg-gray-800 text-gray-300 hover:text-white hover:border-gray-500 text-[10px] font-mono px-1.5 py-0.5 rounded border border-gray-700 select-none cursor-pointer transition-colors"
+                  className="relative bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm select-none cursor-pointer transition-all flex items-center gap-1 group"
                   title="Clicca per vedere le novità della versione 3.7.0"
                 >
                   v{CURRENT_VERSION}
+                  <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[8px] px-1 rounded-full animate-bounce">NEW</span>
                 </button>
                 <span className="bg-blue-900/40 text-blue-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-800/50 select-none uppercase tracking-tighter">
                   REV. 174

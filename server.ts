@@ -442,19 +442,6 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
             \`json_data\` LONGTEXT NOT NULL
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `);
-        await connection.query(`
-          CREATE TABLE IF NOT EXISTS Materiali (
-            \`id\` VARCHAR(100) PRIMARY KEY,
-            \`nome\` VARCHAR(255) NOT NULL,
-            \`fornitore\` VARCHAR(255),
-            \`prezzoLastra\` DECIMAL(15,2),
-            \`linkSchedaTecnica\` TEXT,
-            \`lunghezza\` DECIMAL(15,2),
-            \`larghezza\` DECIMAL(15,2),
-            \`spessore\` DECIMAL(15,2),
-            \`json_data\` LONGTEXT NOT NULL
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        `);
 
         // Automatic migration of legacy clients from app_store to Anagrafiche_Clienti
         try {
@@ -956,19 +943,6 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
 
       // 3. Materiali
       sqlDump += `-- Tabella: Materiali\n`;
-      sqlDump += `DROP TABLE IF EXISTS \`Materiali\`;\n`;
-      sqlDump += `CREATE TABLE \`Materiali\` (\n`;
-      sqlDump += `  \`id\` VARCHAR(100) PRIMARY KEY,\n`;
-      sqlDump += `  \`nome\` VARCHAR(255) NOT NULL,\n`;
-      sqlDump += `  \`fornitore\` VARCHAR(255),\n`;
-      sqlDump += `  \`prezzoLastra\` DECIMAL(15,2),\n`;
-      sqlDump += `  \`linkSchedaTecnica\` TEXT,\n`;
-      sqlDump += `  \`lunghezza\` DECIMAL(15,2),\n`;
-      sqlDump += `  \`larghezza\` DECIMAL(15,2),\n`;
-      sqlDump += `  \`spessore\` DECIMAL(15,2),\n`;
-      sqlDump += `  \`json_data\` LONGTEXT NOT NULL\n`;
-      sqlDump += `) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n\n`;
-
       const [matRows]: any = await pool.query("SELECT * FROM Materiali");
       if (matRows.length > 0) {
         sqlDump += `INSERT INTO \`Materiali\` (\`id\`, \`nome\`, \`fornitore\`, \`prezzoLastra\`, \`linkSchedaTecnica\`, \`lunghezza\`, \`larghezza\`, \`spessore\`, \`json_data\`) VALUES\n`;
@@ -1679,6 +1653,17 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     console.log(`[Server] Avviato con successo sulla porta ${PORT}`);
     console.log(`[Server] Ambiente: ${process.env.NODE_ENV || 'development'}`);
     console.log(`[Server] Versione Software: ${version}`);
+    
+    // Forza l'inizializzazione immediata del database se MariaDB è attivo
+    const config = getDbConfig();
+    if (config.dbType === 'mariadb') {
+      console.log("[Server] Database MariaDB rilevato, avvio inizializzazione tabelle...");
+      getMariaPool(config).then(() => {
+        console.log("[Server] MariaDB inizializzato correttamente all'avvio.");
+      }).catch(err => {
+        console.error("[Server] Errore inizializzazione MariaDB all'avvio:", err.message);
+      });
+    }
   });
 }
 console.log("[Server] Avvio del processo start()...");
