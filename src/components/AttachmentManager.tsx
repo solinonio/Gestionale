@@ -185,12 +185,16 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => {
-                      window.open(`/api/attachment-preview/${att.id}`, '_blank');
+                      if (att.nome_file === 'manual_link' && isElectronActive) {
+                        openWithElectron(att.nome_originale);
+                      } else {
+                        window.open(`/api/attachment-preview/${att.id}`, '_blank');
+                      }
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded-lg text-[10px] font-bold transition-all"
                   >
                     <Eye size={14} />
-                    ANTEPRIMA
+                    APRI FILE
                   </button>
                   <button 
                     onClick={() => {
