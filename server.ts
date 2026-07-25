@@ -349,19 +349,23 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
     return false;
   }
 
-  async function getMariaPool(config: any) {
+  async function getMariaPool(config: any, force: boolean = false) {
+    if (force) {
+      console.log("[MariaDB] Forza reset del pool richiesto.");
+      resetMariaPool();
+    }
     const now = Date.now();
     if (now - lastFailedTime < COOLDOWN_MS) {
       throw new Error("MariaDB è temporaneamente non raggiungibile (circuit breaker attivo).");
     }
 
-    if (poolPromise) {
+    if (poolPromise && !force) {
       return poolPromise;
     }
 
     poolPromise = (async () => {
       // 1. If we already have a pool, try to validate it
-      if (mariaPool) {
+      if (mariaPool && !force) {
         try {
           const connection = await mariaPool.getConnection();
           connection.release();
@@ -400,48 +404,63 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
       let connection;
       try {
         connection = await mariaPool.getConnection();
-        await connection.query(`
-          CREATE TABLE IF NOT EXISTS app_store (
-            \`key\` VARCHAR(100) PRIMARY KEY,
-            \`value\` LONGTEXT NOT NULL
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        `);
+        console.log("[MariaDB] Connessione riuscita. Inizio verifica tabelle...");
+
+        const tables = [
+          {
+            name: 'app_store',
+            sql: `CREATE TABLE IF NOT EXISTS app_store (
+              \`key\` VARCHAR(100) PRIMARY KEY,
+              \`value\` LONGTEXT NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+          },
+          {
+            name: 'Anagrafiche_Clienti',
+            sql: `CREATE TABLE IF NOT EXISTS Anagrafiche_Clienti (
+              \`id\` VARCHAR(100) PRIMARY KEY,
+              \`name\` VARCHAR(255) NOT NULL,
+              \`intestazione\` VARCHAR(255),
+              \`email\` VARCHAR(255),
+              \`phone\` VARCHAR(100),
+              \`address\` TEXT,
+              \`cap\` VARCHAR(20),
+              \`city\` VARCHAR(100),
+              \`vatNumber\` VARCHAR(100),
+              \`sdiCode\` VARCHAR(50),
+              \`json_data\` LONGTEXT NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+          },
+          {
+            name: 'preventivi',
+            sql: `CREATE TABLE IF NOT EXISTS preventivi (
+              \`id\` VARCHAR(100) PRIMARY KEY,
+              \`numero\` VARCHAR(50),
+              \`anno\` INT,
+              \`data\` VARCHAR(20),
+              \`cliente\` VARCHAR(255),
+              \`totale\` DECIMAL(15,2),
+              \`json_data\` LONGTEXT NOT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
+          }
+        ];
+
+        for (const t of tables) {
+          try {
+            await connection.query(t.sql);
+            console.log(`[MariaDB] Tabella '${t.name}' verificata.`);
+          } catch (tErr: any) {
+            console.error(`[MariaDB] Errore tabella '${t.name}':`, tErr.message);
+          }
+        }
         
         // Drop legacy attachment tables as requested
         try {
           await connection.query("DROP TABLE IF EXISTS allegati_clienti");
           await connection.query("DROP TABLE IF EXISTS allegati_preventivi");
-        } catch (dropErr) {
-          console.warn("[MariaDB] Errore durante il drop delle tabelle allegati:", dropErr);
+          console.log("[MariaDB] Tabelle allegati legacy rimosse.");
+        } catch (dropErr: any) {
+          console.warn("[MariaDB] Errore durante il drop delle tabelle allegati:", dropErr.message);
         }
-
-        await connection.query(`
-          CREATE TABLE IF NOT EXISTS Anagrafiche_Clienti (
-            \`id\` VARCHAR(100) PRIMARY KEY,
-            \`name\` VARCHAR(255) NOT NULL,
-            \`intestazione\` VARCHAR(255),
-            \`email\` VARCHAR(255),
-            \`phone\` VARCHAR(100),
-            \`address\` TEXT,
-            \`cap\` VARCHAR(20),
-            \`city\` VARCHAR(100),
-            \`vatNumber\` VARCHAR(100),
-            \`sdiCode\` VARCHAR(50),
-            \`json_data\` LONGTEXT NOT NULL
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        `);
-        
-        await connection.query(`
-          CREATE TABLE IF NOT EXISTS preventivi (
-            \`id\` VARCHAR(100) PRIMARY KEY,
-            \`numero\` VARCHAR(50),
-            \`anno\` INT,
-            \`data\` VARCHAR(20),
-            \`cliente\` VARCHAR(255),
-            \`totale\` DECIMAL(15,2),
-            \`json_data\` LONGTEXT NOT NULL
-          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-        `);
 
         // Automatic migration of legacy clients from app_store to Anagrafiche_Clienti
         try {
@@ -1116,17 +1135,17 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
   });
 
   app.post("/api/db-force-init", async (req, res) => {
-    console.log("[API] POST /api/db-force-init requested");
+    console.log("[API] POST /api/db-force-init requested - Resetting MariaDB Pool");
     try {
       const config = getDbConfig();
       if (config.dbType !== 'mariadb') {
         return res.json({ success: false, error: "Database MariaDB non configurato come attivo." });
       }
       
-      // La funzione getMariaPool esegue già i CREATE TABLE IF NOT EXISTS
-      await getMariaPool(config);
+      // Forziamo il reset del pool per assicurarci che le nuove impostazioni o lo stato del DB siano puliti
+      await getMariaPool(config, true);
       
-      console.log("[API] Inizializzazione tabelle MariaDB completata con successo.");
+      console.log("[API] Inizializzazione tabelle MariaDB completata.");
       return res.json({ success: true, message: "Tabelle inizializzate correttamente." });
     } catch (err: any) {
       console.error("[API] Errore in /api/db-force-init:", err);
