@@ -1421,11 +1421,15 @@ Ecco il testo del PDF da analizzare:
                     <AttachmentManager 
                       type="quotation" 
                       id={props.editingQuotation?.id || 'new'} 
-                      title="Allegati Preventivo"
+                      title="Link Allegati (NAS/PC)"
                     />
-                    <p className="mt-3 text-[10px] text-gray-500 italic leading-tight">
-                      * Carica i file direttamente o usa il pulsante <strong>INSERISCI PERCORSO</strong> per collegare file sul NAS o sulla rete locale senza caricarli.
-                    </p>
+                    <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-100">
+                      <p className="text-[10px] text-blue-800 leading-relaxed font-medium">
+                        <strong>Istruzioni:</strong> Clicca sul pulsante per selezionare un file dal tuo PC. 
+                        Il sistema salverà automaticamente il link completo utilizzando il percorso radice configurato (icona ingranaggio).
+                        Per aprire il file, usa il pulsante <strong>COPIA PERCORSO</strong> e incollalo in una cartella di Windows.
+                      </p>
+                    </div>
                   </div>
                 </div>
             )}

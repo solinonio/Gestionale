@@ -82,51 +82,14 @@ export default function QuotationManager({ setActiveTab, initialCreating, initia
           amount: number;
         }[] = [];
 
-        // Check legacy single attachment fields
-        if (
-          client.attachmentPath &&
-          client.attachmentDate &&
-          client.attachmentProgressive &&
-          client.attachmentAmount &&
-          parseFloat(client.attachmentAmount.toString()) > 0
-        ) {
-          allClientAttachments.push({
-            id: 'legacy-attachment',
-            path: client.attachmentPath,
-            filename: client.attachmentPath.split('/').pop() || 'Documento PDF',
-            date: client.attachmentDate,
-            progressive: client.attachmentProgressive,
-            amount: parseFloat(client.attachmentAmount.toString())
-          });
-        }
-
-        // Check modern attachments array
-        if (client.attachments && client.attachments.length > 0) {
-          for (const att of client.attachments) {
-            if (att.path && att.date && att.progressive && att.amount) {
-              const amountNum = parseFloat(att.amount.toString());
-              if (amountNum > 0 && !allClientAttachments.some(x => x.path === att.path)) {
-                allClientAttachments.push({
-                  id: att.id,
-                  path: att.path,
-                  filename: att.filename || 'Documento PDF',
-                  date: att.date,
-                  progressive: att.progressive,
-                  amount: amountNum
-                });
-              }
-            }
-          }
-        }
-
+        // Logic for client attachments removed as it is now managed via AttachmentManager
         if (allClientAttachments.length === 0) continue;
 
         for (const att of allClientAttachments) {
           // Double check if this attachment already has a matching quotation in the database
           // Match by client ID, number/progressive, and date OR by exact attachment path
           const alreadyExists = currentQuotations.some(q => 
-            (q.clientId === client.id && q.number === att.progressive && q.date === att.date) ||
-            (q.attachment === att.path)
+            (q.clientId === client.id && q.number === att.progressive && q.date === att.date)
           );
 
           if (!alreadyExists) {

@@ -151,16 +151,12 @@ export default function Anagrafiche({ setActiveTab, selectedClientId, onClearSel
     setEditingAttachmentId(null);
     
     if (client) {
-      // Pre-fill with last attachment data if available
+      // Clear details as we are moving to AttachmentManager
       setAttachmentDetails({
-        date: client.attachmentDate || new Date().toISOString().split('T')[0],
-        progressive: client.attachmentProgressive || '',
-        amount: client.attachmentAmount ? client.attachmentAmount.toString() : ''
+        date: new Date().toISOString().split('T')[0],
+        progressive: '',
+        amount: ''
       });
-      if (client.attachmentPath) {
-        setLocalAttachmentPath(client.attachmentPath);
-        setLocalAttachmentName(client.attachmentPath.split(/[\\/]/).pop() || null);
-      }
     } else {
       setAttachmentDetails({
         date: new Date().toISOString().split('T')[0],

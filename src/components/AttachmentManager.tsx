@@ -1,30 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Paperclip, 
-  Trash2, 
-  Download, 
-  FileUp, 
   Loader2, 
-  FileText, 
-  Image as ImageIcon, 
-  File, 
-  Eye, 
-  X,
+  Trash2, 
   Link,
   ExternalLink,
   Plus,
   Settings,
-  HardDrive
+  HardDrive,
+  X
 } from 'lucide-react';
-import { getAttachments, uploadAttachment, downloadAttachment, deleteAttachment, addAttachmentLink } from '../lib/db';
+import { getAttachments, deleteAttachment, addAttachmentLink } from '../lib/db';
 
 interface Attachment {
   id: string;
   nome_originale: string;
   nome_file: string;
+  percorso_file: string;
   dimensione: number;
   data_caricamento: string;
-  mimetype?: string;
 }
 
 interface AttachmentManagerProps {
@@ -37,18 +31,14 @@ interface AttachmentManagerProps {
 export const AttachmentManager: React.FC<AttachmentManagerProps> = ({ 
   type, 
   id, 
-  title = "Gestione Allegati Server",
+  title = "Allegati",
   className = "" 
 }) => {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showPathInput, setShowPathInput] = useState(false);
-  const [showNasConfig, setShowNasConfig] = useState(false);
   const [nasRoot, setNasRoot] = useState(localStorage.getItem('nas_root_path') || '\\\\NAS\\Upload\\');
-  const [isNasMode, setIsNasMode] = useState(localStorage.getItem('nas_mode') === 'true');
-  const [manualPath, setManualPath] = useState('');
+  const [showConfig, setShowConfig] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -62,304 +52,172 @@ export const AttachmentManager: React.FC<AttachmentManagerProps> = ({
     setError(null);
     try {
       const data = await getAttachments(type, id);
-      setAttachments(data || []);
+      setAttachments(data.attachments || data || []);
     } catch (err: any) {
-      console.error("Errore caricamento allegati:", err);
-      setError("Impossibile caricare gli allegati");
+      setError("Errore caricamento allegati");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddManualPath = async () => {
-    if (!manualPath.trim()) return;
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     
     if (id === 'new') {
-      alert("Salva l'elemento prima di poter aggiungere allegati.");
+      alert("Salva prima l'elemento per poter aggiungere allegati.");
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
     setLoading(true);
+    setError(null);
     try {
-      await addAttachmentLink(manualPath.trim(), type, id);
-      setManualPath('');
-      setShowPathInput(false);
+      let root = nasRoot.trim();
+      if (root && !root.endsWith('\\') && !root.endsWith('/')) {
+        root += root.includes('/') ? '/' : '\\';
+      }
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fullPath = `${root}${file.name}`;
+        await addAttachmentLink(fullPath, type, id);
+      }
+      
       await loadAttachments();
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
-      setError(err.message || "Errore durante l'aggiunta del percorso");
+      setError(err.message || "Errore durante l'aggiunta");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    if (id === 'new') {
-      alert("Salva l'elemento prima di poter caricare degli allegati.");
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
-    setUploading(true);
-    setError(null);
-    try {
-      let root = nasRoot.trim();
-      if (isNasMode && root) {
-        // Assicura che il percorso termini con un separatore
-        if (!root.endsWith('\\') && !root.endsWith('/')) {
-          root += root.includes('/') ? '/' : '\\';
-        }
-      }
-
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (isNasMode) {
-          // Modalità NAS Automatica: non carica il file, salva solo il percorso
-          const fullPath = `${root}${file.name}`;
-          await addAttachmentLink(fullPath, type, id);
-        } else {
-          // Modalità standard: carica il file sul server
-          await uploadAttachment(file, type, id);
-        }
-      }
-      await loadAttachments();
-    } catch (err: any) {
-      console.error("Errore upload allegato:", err);
-      setError(err.message || "Errore durante l'upload");
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
   const handleDelete = async (attachmentId: string) => {
-    if (!confirm("Sei sicuro di voler eliminare questo allegato?")) return;
-
+    if (!confirm("Rimuovere questo link?")) return;
     try {
       await deleteAttachment(attachmentId);
-      setAttachments(prev => prev.filter(a => a.id !== attachmentId));
+      await loadAttachments();
     } catch (err: any) {
-      console.error("Errore eliminazione allegato:", err);
-      alert("Errore durante l'eliminazione");
+      setError("Errore durante l'eliminazione");
     }
-  };
-
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
-
-  const getFileIcon = (att: Attachment) => {
-    if (att.nome_file === 'manual_link') return <Link size={18} className="text-orange-500" />;
-    const filename = att.nome_originale;
-    const ext = filename.split('.').pop()?.toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) return <ImageIcon size={18} className="text-blue-500" />;
-    if (ext === 'pdf') return <FileText size={18} className="text-red-500" />;
-    return <File size={18} className="text-gray-500" />;
   };
 
   if (!id || id === 'new') {
     return (
       <div className={`p-4 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-center ${className}`}>
         <Paperclip className="mx-auto text-gray-400 mb-2" size={24} />
-        <p className="text-xs text-gray-500 font-medium">Salva prima l'elemento per poter gestire gli allegati sul server.</p>
+        <p className="text-xs text-gray-500 font-medium">Salva prima il preventivo per poter inserire i link ai file.</p>
       </div>
     );
   }
 
   return (
-    <div className={`space-y-3 ${className}`}>
-      <div className="flex items-center justify-between">
-        <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
-          <Paperclip size={14} className="text-blue-600" />
-          {title} ({attachments.length})
+    <div className={`space-y-4 ${className}`}>
+      <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+        <h4 className="text-[12px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-2">
+          <Paperclip size={16} />
+          {title}
         </h4>
         <div className="flex items-center gap-2">
-           {uploading && <Loader2 size={14} className="animate-spin text-blue-600" />}
-           
-           <button 
-             onClick={() => setShowNasConfig(!showNasConfig)}
-             className={`p-1.5 rounded transition-colors ${isNasMode ? 'bg-orange-100 text-orange-600 border border-orange-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
-             title="Configurazione NAS"
-           >
-             <Settings size={14} />
-           </button>
-
-           <button 
-             onClick={() => setShowPathInput(!showPathInput)}
-             className="flex items-center gap-1 px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-[10px] font-bold transition-colors"
-           >
-             <Link size={12} />
-             INSERISCI PERCORSO
-           </button>
+           {loading && <Loader2 size={14} className="animate-spin text-blue-600" />}
            <button 
              onClick={() => fileInputRef.current?.click()}
-             disabled={uploading}
-             className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold transition-colors disabled:opacity-50"
+             disabled={loading}
+             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
            >
-             <Plus size={12} />
-             {isNasMode ? 'AGGIUNGI DAL NAS' : 'CARICA FILE'}
+             <Plus size={16} />
+             SELEZIONA FILE DAL PC / NAS
            </button>
            <input 
              type="file" 
-             ref={fileInputRef} 
-             onChange={handleFileUpload} 
-             multiple 
+             ref={fileInputRef}
+             onChange={handleFileSelect}
              className="hidden" 
+             multiple
            />
         </div>
       </div>
 
-      {showNasConfig && (
-        <div className="p-3 bg-orange-50 border border-orange-100 rounded-md space-y-3">
-          <div className="flex items-center justify-between">
-            <h5 className="text-[10px] font-bold text-orange-800 uppercase flex items-center gap-1">
-              <HardDrive size={12} />
-              Configurazione NAS Automatica
-            </h5>
-            <button onClick={() => setShowNasConfig(false)} className="text-orange-400 hover:text-orange-600">
-              <X size={14} />
-            </button>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  className="sr-only peer" 
-                  checked={isNasMode}
-                  onChange={(e) => {
-                    const val = e.target.checked;
-                    setIsNasMode(val);
-                    localStorage.setItem('nas_mode', String(val));
-                  }}
-                />
-                <div className="w-7 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-orange-500"></div>
-              </label>
-              <span className="text-[10px] font-bold text-orange-900">Attiva Collegamento Automatico NAS</span>
-            </div>
-            
-            <div className="space-y-1">
-              <label className="text-[9px] font-bold text-orange-700 uppercase">Percorso Radice NAS (es: \\NAS\Preventivi\)</label>
-              <input 
-                type="text"
-                value={nasRoot}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setNasRoot(val);
-                  localStorage.setItem('nas_root_path', val);
-                }}
-                className="w-full px-2 py-1.5 text-[11px] font-mono border border-orange-200 rounded outline-none focus:border-orange-500"
-                placeholder="\\NAS\Documenti\"
-              />
-            </div>
-            <p className="text-[9px] text-orange-600 italic leading-tight">
-              Quando questa modalità è attiva, selezionando un file verrà salvato solo il collegamento al percorso NAS impostato, senza caricare il file sul server.
-            </p>
-          </div>
+      <div className="p-3 bg-orange-50 border border-orange-100 rounded-lg">
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-[10px] font-bold text-orange-800 uppercase flex items-center gap-1">
+            <Settings size={12} />
+            Cartella di Origine (NAS o Locale)
+          </label>
         </div>
-      )}
+        <input 
+          type="text"
+          value={nasRoot}
+          onChange={(e) => {
+            setNasRoot(e.target.value);
+            localStorage.setItem('nas_root_path', e.target.value);
+          }}
+          className="w-full px-3 py-2 text-[12px] font-mono border border-orange-200 rounded-md outline-none focus:border-orange-500 bg-white shadow-sm"
+          placeholder="Esempio: \\NAS\Preventivi\  oppure  C:\Lavori\"
+        />
+        <p className="text-[9px] text-orange-600 mt-2 italic leading-tight">
+          * Il sistema userà questa cartella come base. Se selezioni un file, aggiungerà il suo nome a questo percorso automaticamente.
+        </p>
+      </div>
 
-      {showPathInput && (
-        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md space-y-2">
-          <p className="text-[10px] font-bold text-blue-800">Inserisci il percorso completo del file (NAS o Locale):</p>
-          <div className="flex gap-2">
-            <input 
-              type="text"
-              value={manualPath}
-              onChange={(e) => setManualPath(e.target.value)}
-              placeholder="Esempio: \\NAS\Documenti\File.pdf oppure C:\Lavori\Disegno.jpg"
-              className="flex-1 px-2 py-1.5 text-[11px] border border-blue-200 rounded outline-none focus:border-blue-500"
-              onKeyDown={(e) => e.key === 'Enter' && handleAddManualPath()}
-            />
-            <button 
-              onClick={handleAddManualPath}
-              className="px-3 py-1 bg-blue-600 text-white text-[10px] font-bold rounded hover:bg-blue-700"
-            >
-              AGGIUNGI
-            </button>
-          </div>
-          <p className="text-[9px] text-blue-600 italic">Incolla qui il percorso esatto del file per salvarlo nel database.</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="p-2 bg-red-50 border border-red-100 text-red-600 text-[10px] rounded flex justify-between items-center">
-          <span>{error}</span>
-          <button onClick={() => setError(null)}><X size={12} /></button>
-        </div>
-      )}
-
-      {loading && attachments.length === 0 ? (
-        <div className="flex justify-center py-4">
-          <Loader2 size={24} className="animate-spin text-gray-400" />
-        </div>
-      ) : attachments.length > 0 ? (
-        <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto pr-1">
-          {attachments.map((att) => (
-            <div key={att.id} className="flex items-center gap-3 p-2 bg-white border border-gray-200 rounded-md hover:border-blue-300 transition-all group">
-              <div className="p-1.5 bg-gray-50 rounded border border-gray-100">
-                {getFileIcon(att)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-bold text-gray-900 truncate" title={att.nome_originale}>
-                  {att.nome_originale}
-                </p>
-                <div className="flex items-center gap-2 text-[9px] text-gray-500 font-medium">
-                  {att.nome_file === 'manual_link' ? (
-                    <span className="text-orange-600">Percorso NAS/Locale</span>
-                  ) : (
-                    <span>{formatSize(att.dimensione)}</span>
-                  )}
-                  <span>•</span>
-                  <span>{new Date(att.data_caricamento).toLocaleDateString()}</span>
+      <div className="space-y-3">
+        {attachments.length > 0 ? (
+          attachments.map((att) => (
+            <div key={att.id} className="flex flex-col p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-400 transition-all group shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                    <Link size={18} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[12px] font-bold text-gray-900 truncate max-w-[300px]">
+                      {att.nome_originale.split('\\').pop()?.split('/').pop()}
+                    </span>
+                    <span className="text-[9px] text-gray-400 uppercase font-bold tracking-tighter">
+                      Link salvato nel Database
+                    </span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-1">
-                {att.nome_file === 'manual_link' ? (
+                <div className="flex items-center gap-2">
                   <button 
                     onClick={() => {
                       navigator.clipboard.writeText(att.nome_originale);
-                      alert("Percorso copiato negli appunti!\nIncollalo in una cartella per aprire il file.");
+                      alert("PERCORSO COPIATO!\n\nOra puoi incollarlo in una cartella o su 'Esegui' (Win+R) per aprire il file.");
                     }}
-                    className="p-1 text-orange-600 hover:bg-orange-50 rounded flex items-center gap-1"
-                    title="Copia Percorso NAS"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 rounded-lg text-[10px] font-bold transition-all"
                   >
                     <ExternalLink size={14} />
-                    <span className="text-[8px] font-bold">COPIA</span>
+                    COPIA PERCORSO
                   </button>
-                ) : (
                   <button 
-                    onClick={() => downloadAttachment(att.id)}
-                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                    title="Scarica"
+                    onClick={() => handleDelete(att.id)}
+                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Rimuovi"
                   >
-                    <Download size={14} />
+                    <Trash2 size={16} />
                   </button>
-                )}
-                <button 
-                  onClick={() => handleDelete(att.id)}
-                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Elimina"
-                >
-                  <Trash2 size={14} />
-                </button>
+                </div>
+              </div>
+              <div className="bg-gray-50 p-2.5 rounded-md border border-gray-100 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-mono text-gray-600 break-all leading-tight select-all flex-1">
+                  {att.nome_originale}
+                </p>
+                <div className="text-[10px] text-gray-400 font-bold whitespace-nowrap bg-white px-2 py-0.5 rounded border border-gray-100">
+                  LINK NAS
+                </div>
               </div>
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50/30">
-          <FileUp size={24} className="mx-auto text-gray-300 mb-2" />
-          <p className="text-[10px] text-gray-400">Nessun file caricato sul server.</p>
-        </div>
-      )}
+          ))
+        ) : (
+          <div className="text-center py-12 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+            <Paperclip size={32} className="mx-auto text-gray-300 mb-3 opacity-40" />
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Nessun allegato collegato</p>
+            <p className="text-[10px] text-gray-400 mt-2">Usa il pulsante in alto per aggiungere un link ai tuoi file locali.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
+
 };
