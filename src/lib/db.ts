@@ -116,45 +116,72 @@ export const syncWithServer = async (force: boolean = false): Promise<void> => {
         
         if (fileVal !== undefined) {
           if (Array.isArray(fileVal)) {
-            // Merge array data safely using IDs
             const localVal = getLocalStorageItem<any[]>(key, []);
-            const mergedMap = new Map<string, any>();
+            
+            let updatedList: any[];
 
-            // 1. Populate map with localVal first to retain local updates
-            if (Array.isArray(localVal)) {
-              for (const item of localVal) {
-                if (item && item.id) {
-                  mergedMap.set(String(item.id), item);
-                }
-              }
-            }
-
-            // 2. Merge server data, ensuring allegati aren't wiped out if server payload lacks them
-            for (const item of fileVal) {
-              if (item && item.id) {
-                const existing = mergedMap.get(String(item.id));
-                if (existing) {
-                  const mergedItem = { ...existing, ...item };
-                  // If local item has attachments but server item returned empty attachments, preserve local ones
-                  if (Array.isArray(existing.allegati) && existing.allegati.length > 0 && (!Array.isArray(item.allegati) || item.allegati.length === 0)) {
-                    mergedItem.allegati = existing.allegati;
+            if (newDbType === 'mariadb') {
+              // When MariaDB is active, server data is 100% authoritative.
+              // Do NOT union stale local items (which would resurrect deleted items across PCs).
+              const localMap = new Map<string, any>();
+              if (Array.isArray(localVal)) {
+                for (const item of localVal) {
+                  if (item && item.id) {
+                    localMap.set(String(item.id), item);
                   }
-                  mergedMap.set(String(item.id), mergedItem);
-                } else {
-                  mergedMap.set(String(item.id), item);
                 }
               }
+
+              updatedList = fileVal.map((item: any) => {
+                if (item && item.id) {
+                  const existing = localMap.get(String(item.id));
+                  if (existing) {
+                    const mergedItem = { ...existing, ...item };
+                    // Preserve local allegati if server item doesn't have them
+                    if (Array.isArray(existing.allegati) && existing.allegati.length > 0 && (!Array.isArray(item.allegati) || item.allegati.length === 0)) {
+                      mergedItem.allegati = existing.allegati;
+                    }
+                    return mergedItem;
+                  }
+                }
+                return item;
+              });
+            } else {
+              // Fallback / JSON mode: Merge server data with local cache
+              const mergedMap = new Map<string, any>();
+              if (Array.isArray(localVal)) {
+                for (const item of localVal) {
+                  if (item && item.id) {
+                    mergedMap.set(String(item.id), item);
+                  }
+                }
+              }
+
+              for (const item of fileVal) {
+                if (item && item.id) {
+                  const existing = mergedMap.get(String(item.id));
+                  if (existing) {
+                    const mergedItem = { ...existing, ...item };
+                    if (Array.isArray(existing.allegati) && existing.allegati.length > 0 && (!Array.isArray(item.allegati) || item.allegati.length === 0)) {
+                      mergedItem.allegati = existing.allegati;
+                    }
+                    mergedMap.set(String(item.id), mergedItem);
+                  } else {
+                    mergedMap.set(String(item.id), item);
+                  }
+                }
+              }
+              updatedList = Array.from(mergedMap.values());
             }
 
-            const mergedList = Array.from(mergedMap.values());
             const currentValStr = JSON.stringify(inMemoryStore[key] || []);
-            const mergedValStr = JSON.stringify(mergedList);
+            const newValStr = JSON.stringify(updatedList);
 
-            if (currentValStr !== mergedValStr) {
-              inMemoryStore[key] = mergedList;
+            if (currentValStr !== newValStr) {
+              inMemoryStore[key] = updatedList;
               hasChanges = true;
             }
-            safeSetItem(key, mergedValStr);
+            safeSetItem(key, newValStr);
 
           } else {
             const currentValStr = JSON.stringify(inMemoryStore[key]);
@@ -165,10 +192,10 @@ export const syncWithServer = async (force: boolean = false): Promise<void> => {
             }
             safeSetItem(key, fileValStr);
           }
-        } else if (inMemoryStore[key] !== undefined) {
+        } else if (newDbType !== 'mariadb' && inMemoryStore[key] !== undefined) {
           payloadToSave[key] = inMemoryStore[key];
           needsSaveToServer = true;
-        } else {
+        } else if (newDbType !== 'mariadb') {
           const localValStr = safeGetItem(key);
           if (localValStr !== null) {
             try {

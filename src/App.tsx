@@ -290,13 +290,13 @@ export default function App() {
                 <button 
                   onClick={() => setIsChangelogOpen(true)}
                   className="relative bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm select-none cursor-pointer transition-all flex items-center gap-1 group"
-                  title="Clicca per vedere le novità della versione 3.7.1"
+                  title="Clicca per vedere le novità della versione 3.8.0"
                 >
                   v{CURRENT_VERSION}
                   <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[8px] px-1 rounded-full animate-bounce">NEW</span>
                 </button>
                 <span className="bg-blue-900/40 text-blue-300 text-[9px] font-bold px-1.5 py-0.5 rounded border border-blue-800/50 select-none uppercase tracking-tighter">
-                  REV. 175
+                  REV. 176
                 </span>
                 {remoteSoftwareVersion && (
                   <button
@@ -460,6 +460,23 @@ export default function App() {
           </div>
         </nav>
       </header>
+
+      {dbStatus.dbType === 'mariadb-fallback' && (
+        <div className="bg-amber-950/80 border-b border-amber-600/50 px-4 py-2.5 text-amber-200 text-xs flex items-center justify-between gap-3 animate-fade-in shadow-md">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="text-amber-400 shrink-0" size={18} />
+            <span>
+              <strong>ATTENZIONE — Database MariaDB non raggiungibile!</strong> {dbStatus.fallbackReason || 'Impossibile connettersi al server MariaDB/NAS.'} Il gestionale è in modalità temporanea di backup locale. Le modifiche non saranno visibili sugli altri PC finché MariaDB non torna online.
+            </span>
+          </div>
+          <button 
+            onClick={() => syncWithServer(true)} 
+            className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-black font-semibold rounded-md text-xs shrink-0 transition-colors cursor-pointer"
+          >
+            Riprova Connessione
+          </button>
+        </div>
+      )}
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <LogViewer isOpen={isLogViewerOpen} onClose={() => setIsLogViewerOpen(false)} />

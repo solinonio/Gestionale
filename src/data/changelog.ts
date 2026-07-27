@@ -11,6 +11,26 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.8.0",
+    date: "2026-07-27",
+    title: "Gestionale v3.8.0 - Sincronizzazione MariaDB Autoritativa e Timeout Allegati",
+    type: "minor",
+    changes: [
+      {
+        category: "feature",
+        text: "Sincronizzazione MariaDB Autoritativa: Quando MariaDB è connesso, le eliminazioni e le modifiche effettuate su altri PC o via phpMyAdmin vengono riflesse immediatamente senza essere sovrascritte da dati locali residui."
+      },
+      {
+        category: "improvement",
+        text: "Timeout Salvataggio Allegati (5s): Implementato un limite massimo di 5 secondi per la lettura e il salvataggio dei file allegati per evitare blocchi dell'interfaccia e mostrare avvisi chiari in caso di file troppo pesanti."
+      },
+      {
+        category: "improvement",
+        text: "Notifica Stato Offline MariaDB: Aggiunto un banner visivo di avviso in cima all'applicazione che segnala se il server MariaDB non è raggiungibile, con pulsante per riprovare la connessione."
+      }
+    ]
+  },
+  {
     version: "3.7.1",
     date: "2026-07-25",
     title: "Gestionale v3.7.1 - Ottimizzazione Database",
