@@ -47,7 +47,7 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
   const [quotationLetter, setQuotationLetter] = useState<string>('');
   const [allegati, setAllegati] = useState<Attachment[]>([]);
   const [activeTab, setActiveTab] = useState<'anagrafica' | 'preventivo' | 'noteCliente' | 'allegati' | 'noteInterne'>('anagrafica');
-// ...
+
   const tabs = [
       { id: 'anagrafica', label: 'Anagrafica', icon: <User size={16} /> },
       { id: 'preventivo', label: 'Preventivo', icon: <FileText size={16} /> },
@@ -574,226 +574,6 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
       setInternalRows(prevRows => [...prevRows, { id: Date.now().toString(), description: '', quantity: 0, link: '', details: '', cost: 0 }]);
   }
 
-  const [isParsingPdf, setIsParsingPdf] = useState(false);
-
-  const handlePdfAutoImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsParsingPdf(true);
-    try {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const dataUrl = event.target?.result as string;
-        try {
-          // 1. Extract text from PDF
-          const extractedText = await extractTextFromPdf(dataUrl);
-          if (!extractedText || extractedText.trim().length === 0) {
-            throw new Error("Impossibile estrarre testo leggibile dal PDF.");
-          }
-
-          // 2. Call server-side Gemini API
-          const prompt = `Analizza il seguente testo estratto da un preventivo PDF e convertilo in un oggetto JSON strutturato secondo questo schema.
-IMPORTANTE: Restituisci ESCLUSIVAMENTE il codice JSON puro, senza alcun markup markdown (NON inserire \`\`\`json o \`\`\`), senza testo introduttivo o conclusivo. Il risultato deve essere direttamente parsabile con JSON.parse.
-
-Schema JSON richiesto:
-{
-  "clientInfo": {
-    "name": "Nome o Ragione Sociale del cliente",
-    "intestazione": "Eventuale intestazione o Ragione Sociale completa",
-    "email": "Email del cliente",
-    "address": "Indirizzo del cliente",
-    "phone": "Telefono del cliente",
-    "vatNumber": "Partita IVA o Codice Fiscale del cliente",
-    "sdiCode": "Codice SDI o PEC se disponibile",
-    "cap": "CAP",
-    "city": "Città/Comune"
-  },
-  "quotationNumber": "Numero del preventivo (stringa, solo numero principale)",
-  "quotationYear": 2026, // Anno estratto o anno corrente se non trovato (numero)
-  "quotationDate": "YYYY-MM-DD", // Data del preventivo nel formato ISO indicato
-  "rows": [
-    {
-      "description": "Descrizione della voce/riga",
-      "quantity": 1, // Quantità (numero decimale o intero)
-      "price": 100.0 // Prezzo unitario (numero decimale o intero)
-    }
-  ],
-  "notes": "Altre note rilevanti estratte dal preventivo (facoltativo)"
-}
-
-Ecco il testo del PDF da analizzare:
-\${extractedText}`;
-
-          const res = await fetch('/api/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt })
-          });
-
-          if (!res.ok) {
-            throw new Error("Errore durante la chiamata all'API Gemini.");
-          }
-
-          const resData = await res.json();
-          if (!resData.success || !resData.response) {
-            throw new Error(resData.error || "L'API non ha restituito una risposta valida.");
-          }
-
-          const cleanJsonText = resData.response.trim().replace(/^```json/, '').replace(/```$/, '').trim();
-          const parsed = JSON.parse(cleanJsonText);
-
-          // 3. Populate state
-          if (parsed.clientInfo) {
-            // Find existing client or set extracted details
-            const allClients = await getClients();
-            const cleanVat = (parsed.clientInfo.vatNumber || '').trim();
-            const cleanName = (parsed.clientInfo.name || '').trim().toLowerCase();
-            const existingClient = allClients.find(c => 
-              (cleanVat && c.vatNumber === cleanVat) || 
-              (cleanName && (c.name || '').toLowerCase() === cleanName) ||
-              (cleanName && (c.intestazione || '').toLowerCase() === cleanName)
-            );
-
-            if (existingClient) {
-              setClientInfo(existingClient);
-              alert(`Cliente trovato nel database: \${existingClient.name || existingClient.intestazione}`);
-            } else {
-              // Create temporary client with extracted details
-              const tempClient = {
-                id: 'temp-' + Date.now(),
-                name: parsed.clientInfo.name || '',
-                intestazione: parsed.clientInfo.intestazione || '',
-                email: parsed.clientInfo.email || '',
-                address: parsed.clientInfo.address || '',
-                phone: parsed.clientInfo.phone || '',
-                vatNumber: parsed.clientInfo.vatNumber || '',
-                sdiCode: parsed.clientInfo.sdiCode || '',
-                cap: parsed.clientInfo.cap || '',
-                city: parsed.clientInfo.city || ''
-              };
-              
-              // Automatically add client to database to have a valid persistent ID
-              try {
-                const added = await addClient({
-                  name: tempClient.name || tempClient.intestazione || 'Nuovo Cliente PDF',
-                  intestazione: tempClient.intestazione,
-                  email: tempClient.email,
-                  address: tempClient.address,
-                  phone: tempClient.phone,
-                  vatNumber: tempClient.vatNumber,
-                  sdiCode: tempClient.sdiCode,
-                  cap: tempClient.cap,
-                  city: tempClient.city
-                });
-                tempClient.id = added.id;
-                setClientInfo(tempClient);
-                alert(`Nuovo cliente estratto e salvato automaticamente nel database: \${tempClient.name || tempClient.intestazione}`);
-              } catch (clientErr) {
-                // Fallback to temp-id if client save fails
-                setClientInfo(tempClient);
-              }
-            }
-          }
-
-          if (parsed.quotationNumber) {
-            const rawNum = parsed.quotationNumber;
-            const slashIndex = rawNum.indexOf('/');
-            if (slashIndex !== -1) {
-              setQuotationNumber(rawNum.substring(0, slashIndex));
-              setQuotationLetter(rawNum.substring(slashIndex + 1));
-            } else {
-              setQuotationNumber(rawNum);
-              setQuotationLetter('');
-            }
-          }
-
-          if (parsed.quotationYear) {
-            setQuotationYear(parsed.quotationYear);
-          }
-          if (parsed.quotationDate) {
-            setQuotationDate(parsed.quotationDate);
-          }
-
-          if (Array.isArray(parsed.rows) && parsed.rows.length > 0) {
-            const mappedRows = parsed.rows.map((r: any, idx: number) => ({
-              id: 'pdf-' + idx + '-' + Date.now(),
-              description: r.description || '',
-              quantity: typeof r.quantity === 'number' ? r.quantity : 1,
-              price: typeof r.price === 'number' ? r.price : 0
-            }));
-            setRows(mappedRows);
-          }
-
-          if (parsed.notes) {
-            setNotes(parsed.notes);
-          }
-
-          alert("Compilazione automatica da PDF completata con successo!");
-        } catch (err: any) {
-          console.error("Errore nell'elaborazione del PDF:", err);
-          alert(`Errore nell'analisi del PDF con AI: \${err.message || err}`);
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch (err: any) {
-      console.error(err);
-      alert(`Errore di lettura del file: \${err.message}`);
-    } finally {
-      setIsParsingPdf(false);
-      // Clear input value so same file can be uploaded again
-      e.target.value = '';
-    }
-  };
-
-  const extractTextFromPdf = async (pdfDataUrl: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const startTextExtraction = async (pdfjsLib: any) => {
-        try {
-          const base64Content = pdfDataUrl.split(',')[1];
-          const raw = window.atob(base64Content);
-          const rawLength = raw.length;
-          const array = new Uint8Array(new ArrayBuffer(rawLength));
-          for (let i = 0; i < rawLength; i++) {
-            array[i] = raw.charCodeAt(i);
-          }
-
-          const loadingTask = pdfjsLib.getDocument({ data: array });
-          const pdf = await loadingTask.promise;
-          let fullText = "";
-
-          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-            const page = await pdf.getPage(pageNum);
-            const textContent = await page.getTextContent();
-            const pageText = textContent.items
-              .map((item: any) => item.str)
-              .join(" ");
-            fullText += `--- Pagina \${pageNum} ---\n` + pageText + "\n";
-          }
-
-          resolve(fullText);
-        } catch (error) {
-          reject(error);
-        }
-      };
-
-      if (!(window as any).pdfjsLib) {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
-        script.onload = () => {
-          const pdfjsLib = (window as any).pdfjsLib;
-          pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-          startTextExtraction(pdfjsLib);
-        };
-        script.onerror = (e) => reject(new Error('Impossibile caricare la libreria PDF.js per l\'estrazione del testo.'));
-        document.head.appendChild(script);
-      } else {
-        const pdfjsLib = (window as any).pdfjsLib;
-        startTextExtraction(pdfjsLib);
-      }
-    });
-  };
-
   const validateQuotation = async (showSuccessAlert: boolean = true): Promise<{ isValid: boolean, correctedNumber?: string }> => {
     // 1. Check Dati Azienda in tab "anagrafica"
     if (!companyInfo.name || !companyInfo.name.trim()) {
@@ -977,7 +757,7 @@ Ecco il testo del PDF da analizzare:
             installazione,
             collaudo,
             validita,
-            allegati
+            allegati: allegati
         };
 
         if (props.editingQuotation && props.editingQuotation.id) {
@@ -1350,10 +1130,12 @@ Ecco il testo del PDF da analizzare:
             {activeTab === 'allegati' && (
                 <div className="bg-gray-100 p-6 rounded-lg shadow-sm border border-gray-300 space-y-4">
                   <div className='flex justify-end mb-2'>
-                      <button onClick={() => setActiveTab(null as any)} className="text-gray-700 hover:text-gray-900 text-sm">Chiudi</button>
+                      <button onClick={() => setActiveTab(null as any)} className="text-gray-700 hover:text-gray-900 text-sm cursor-pointer">Chiudi</button>
                   </div>
-                  <h3 className="text-lg font-bold text-gray-900">Allegati Preventivo</h3>
-                  <p className="text-sm text-gray-600">Carica file, documenti o immagini di supporto per questo preventivo.</p>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">Allegati Preventivo</h3>
+                    <p className="text-sm text-gray-600">Carica e gestisci i file, documenti o immagini allegati a questo preventivo.</p>
+                  </div>
                   <AttachmentManager attachments={allegati} onChange={setAllegati} />
                 </div>
             )}
@@ -1466,6 +1248,7 @@ Ecco il testo del PDF da analizzare:
           installazione={installazione}
           collaudo={collaudo}
           validita={validita}
+          attachment={allegati.length > 0 ? allegati[0].dataUrl : undefined}
       />
 
       <ClientSelectorPopup 

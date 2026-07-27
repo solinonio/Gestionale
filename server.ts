@@ -498,6 +498,19 @@ Se trovi la ditta sul sito registroimprese.it, estrai con la massima precisione:
           console.warn("[MariaDB] Errore durante il drop delle tabelle allegati:", dropErr.message);
         }
 
+        // Clean up obsolete unique indexes on preventivi table (e.g., on numero) to prevent duplicate key overwrites
+        try {
+          const [indexes]: any = await connection.query("SHOW INDEX FROM preventivi WHERE Key_name != 'PRIMARY' AND Non_unique = 0");
+          if (Array.isArray(indexes)) {
+            for (const idx of indexes) {
+              if (idx.Key_name) {
+                console.log(`[MariaDB] Rimuovo indice univoco obsoleto '${idx.Key_name}' da preventivi per evitare sovrascritture...`);
+                await connection.query(`ALTER TABLE preventivi DROP INDEX \`${idx.Key_name}\``);
+              }
+            }
+          }
+        } catch (idxErr: any) {}
+
         // Automatic migration of legacy clients from app_store to Anagrafiche_Clienti
         try {
           const [legacyRows]: any = await connection.query("SELECT `value` FROM app_store WHERE `key` = 'clients'");

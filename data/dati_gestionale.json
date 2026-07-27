@@ -1,0 +1,43 @@
+{
+  "users": [
+    {
+      "id": "3356865b-c392-4fe8-914c-6676341623d6",
+      "username": "OldGame",
+      "password": "Futti$78@@@",
+      "role": "ADMIN",
+      "createdAt": "2026-07-25T11:41:14.627Z"
+    }
+  ],
+  "quotations": [
+    {
+      "id": "q1",
+      "number": "1",
+      "year": 2026,
+      "date": "2026-01-01",
+      "clientInfo": {
+        "name": "Cliente Test 1"
+      },
+      "totalAmount": 150.5
+    },
+    {
+      "id": "q2",
+      "number": "2",
+      "year": 2026,
+      "date": "2026-01-02",
+      "clientInfo": {
+        "name": "Cliente Test 2"
+      },
+      "totalAmount": 300
+    },
+    {
+      "id": "q3",
+      "number": "3",
+      "year": 2026,
+      "date": "2026-01-03",
+      "clientInfo": {
+        "name": "Cliente Test 3"
+      },
+      "totalAmount": 450
+    }
+  ]
+}

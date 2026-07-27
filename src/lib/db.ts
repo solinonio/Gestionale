@@ -110,13 +110,52 @@ export const syncWithServer = async (force: boolean = false): Promise<void> => {
         const fileVal = fileData[key];
         
         if (fileVal !== undefined) {
-          const currentValStr = JSON.stringify(inMemoryStore[key]);
-          const fileValStr = JSON.stringify(fileVal);
-          if (currentValStr !== fileValStr) {
-            inMemoryStore[key] = fileVal;
-            hasChanges = true;
+          if (Array.isArray(fileVal)) {
+            // Merge array data safely using IDs
+            const localVal = getLocalStorageItem<any[]>(key, []);
+            const mergedMap = new Map<string, any>();
+
+            // First add all items from fileVal (server data)
+            for (const item of fileVal) {
+              if (item && item.id) {
+                mergedMap.set(String(item.id), item);
+              }
+            }
+
+            // Then add local items if not present in server data
+            let localOnlyFound = false;
+            if (Array.isArray(localVal)) {
+              for (const item of localVal) {
+                if (item && item.id && !mergedMap.has(String(item.id))) {
+                  mergedMap.set(String(item.id), item);
+                  localOnlyFound = true;
+                }
+              }
+            }
+
+            const mergedList = Array.from(mergedMap.values());
+            const currentValStr = JSON.stringify(inMemoryStore[key] || []);
+            const mergedValStr = JSON.stringify(mergedList);
+
+            if (currentValStr !== mergedValStr) {
+              inMemoryStore[key] = mergedList;
+              hasChanges = true;
+            }
+            safeSetItem(key, mergedValStr);
+
+            if (localOnlyFound) {
+              payloadToSave[key] = mergedList;
+              needsSaveToServer = true;
+            }
+          } else {
+            const currentValStr = JSON.stringify(inMemoryStore[key]);
+            const fileValStr = JSON.stringify(fileVal);
+            if (currentValStr !== fileValStr) {
+              inMemoryStore[key] = fileVal;
+              hasChanges = true;
+            }
+            safeSetItem(key, fileValStr);
           }
-          safeSetItem(key, fileValStr);
         } else if (inMemoryStore[key] !== undefined) {
           payloadToSave[key] = inMemoryStore[key];
           needsSaveToServer = true;
@@ -214,12 +253,12 @@ export const saveQuotation = async (quotation: Omit<Quotation, 'id'>) => {
 
   // Sync before to ensure we have latest list
   await syncWithServer(); 
-  const quotations = getLocalStorageItem<Quotation[]>('quotations', []);
+  const currentList = getLocalStorageItem<Quotation[]>('quotations', []);
   const newQuotation = { ...quotation, id: generateId() };
-  quotations.push(newQuotation);
+  const updatedList = [...currentList.filter(q => q.id !== newQuotation.id), newQuotation];
   
   // Save locally and push to server
-  await setLocalStorageItem('quotations', quotations);
+  await setLocalStorageItem('quotations', updatedList);
   await syncWithServer(true); // Force push
   
   window.dispatchEvent(new CustomEvent('database-synced'));
@@ -237,25 +276,27 @@ export const updateQuotation = async (quotationId: string, quotation: Omit<Quota
   }
 
   await syncWithServer(); // Get latest
-  const quotations = getLocalStorageItem<Quotation[]>('quotations', []);
-  const index = quotations.findIndex(q => q.id === quotationId);
+  const currentList = getLocalStorageItem<Quotation[]>('quotations', []);
+  const index = currentList.findIndex(q => q.id === quotationId);
+  
+  let updatedList: Quotation[];
   if (index !== -1) {
-    quotations[index] = { ...quotation, id: quotationId };
-    await setLocalStorageItem('quotations', quotations);
+    updatedList = [...currentList];
+    updatedList[index] = { ...quotation, id: quotationId };
   } else {
     console.warn(`Quotation with ID ${quotationId} not found for update. Creating new one.`);
-    const newQuotation = { ...quotation, id: quotationId };
-    quotations.push(newQuotation);
-    await setLocalStorageItem('quotations', quotations);
+    updatedList = [...currentList, { ...quotation, id: quotationId }];
   }
+  
+  await setLocalStorageItem('quotations', updatedList);
   await syncWithServer(true); // Push changes
   window.dispatchEvent(new CustomEvent('database-synced'));
 };
 
 export const deleteQuotation = async (quotationId: string) => {
   await syncWithServer(); // Get latest
-  const quotations = getLocalStorageItem<Quotation[]>('quotations', []);
-  const filtered = quotations.filter(q => q.id !== quotationId);
+  const currentList = getLocalStorageItem<Quotation[]>('quotations', []);
+  const filtered = currentList.filter(q => q.id !== quotationId);
   await setLocalStorageItem('quotations', filtered);
   await syncWithServer(true); // Push deletion
   window.dispatchEvent(new CustomEvent('database-synced'));
