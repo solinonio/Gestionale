@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Attachment } from '../types';
-import { Paperclip, Download, Trash2, File, FileText, Image as ImageIcon, Plus, Eye, X, Loader2, AlertTriangle } from 'lucide-react';
+import { Paperclip, Trash2, File, FileText, Image as ImageIcon, Plus, Eye, X, Copy, Check } from 'lucide-react';
 
 interface AttachmentManagerProps {
   attachments?: Attachment[];
@@ -11,77 +11,51 @@ interface AttachmentManagerProps {
 export default function AttachmentManager({ attachments = [], onChange, readOnly = false }: AttachmentManagerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewingAttachment, setPreviewingAttachment] = useState<Attachment | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const readFileWithTimeout = (file: File, index: number, timeoutMs: number = 5000): Promise<Attachment> => {
-    return new Promise<Attachment>((resolve, reject) => {
-      const reader = new FileReader();
-
-      const timer = setTimeout(() => {
-        try {
-          reader.abort();
-        } catch (e) {
-          // ignore abort errors
-        }
-        reject(new Error(`Timeout caricamento (5s): Il file "${file.name}" ha impiegato più di 5 secondi. Il file potrebbe essere troppo grande.`));
-      }, timeoutMs);
-
-      reader.onload = (uploadEvent) => {
-        clearTimeout(timer);
-        const dataUrl = uploadEvent.target?.result as string;
-        if (dataUrl) {
-          resolve({
-            id: `${Date.now()}-${index}-${Math.random().toString(36).substring(2, 7)}`,
-            filename: file.name,
-            mimeType: file.type || 'application/octet-stream',
-            size: file.size,
-            dataUrl,
-            uploadedAt: new Date().toLocaleDateString('it-IT') + ' ' + new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
-          });
-        } else {
-          reject(new Error(`Lettura del file "${file.name}" fallita.`));
-        }
-      };
-
-      reader.onerror = () => {
-        clearTimeout(timer);
-        reject(new Error(`Errore durante la lettura del file "${file.name}".`));
-      };
-
-      reader.onabort = () => {
-        clearTimeout(timer);
-        reject(new Error(`Lettura del file "${file.name}" annullata per timeout (5s).`));
-      };
-
-      reader.readAsDataURL(file);
-    });
+  // Garantisce che nessun dato Base64 venga mai trasmesso al database
+  const sanitizeAttachment = (att: Attachment): Attachment => {
+    const clean: Attachment = {
+      id: att.id,
+      filename: att.filename,
+      mimeType: att.mimeType || 'application/pdf',
+      size: att.size || 0,
+      uploadedAt: att.uploadedAt || new Date().toLocaleDateString('it-IT'),
+      path: att.path || `allegati/${att.filename}`
+    };
+    // Se c'è un Blob URL temporaneo di sessione (blob:http...), lo mantiene in memoria locale per l'anteprima istantanea
+    if (att.dataUrl && att.dataUrl.startsWith('blob:')) {
+      clean.dataUrl = att.dataUrl;
+    }
+    return clean;
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !onChange) return;
 
     const fileList = Array.from(files);
-    setIsUploading(true);
-    setUploadError(null);
 
-    try {
-      const addedAttachments = await Promise.all(
-        fileList.map((file: File, index: number) => readFileWithTimeout(file, index, 5000))
-      );
+    // Generazione automatica dei collegamenti senza salvare il binario
+    const newAttachments: Attachment[] = fileList.map((file: File, index: number) => {
+      // Blob URL temporaneo valido solo durante la sessione browser per l'anteprima immediata
+      const sessionBlobUrl = URL.createObjectURL(file);
+      
+      return sanitizeAttachment({
+        id: `${Date.now()}-${index}-${Math.random().toString(36).substring(2, 7)}`,
+        filename: file.name,
+        mimeType: file.type || 'application/pdf',
+        size: file.size,
+        path: `allegati/${file.name}`,
+        dataUrl: sessionBlobUrl,
+        uploadedAt: new Date().toLocaleDateString('it-IT') + ' ' + new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+      });
+    });
 
-      if (onChange) {
-        onChange([...attachments, ...addedAttachments]);
-      }
-    } catch (err: any) {
-      console.error('Errore/Timeout caricamento allegati:', err);
-      setUploadError(err.message || 'Errore o timeout durante il caricamento del file.');
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+    onChange([...attachments.map(sanitizeAttachment), ...newAttachments]);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -91,30 +65,43 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
     onChange(filtered);
   };
 
+  const handleCopyPath = (pathString: string, id: string) => {
+    navigator.clipboard.writeText(pathString).then(() => {
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }).catch(err => {
+      console.error("Errore durante la copia negli appunti:", err);
+    });
+  };
+
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+    if (!bytes || bytes === 0) return 'File sul NAS';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getFileIcon = (mimeType: string) => {
-    if (mimeType.startsWith('image/')) {
+  const getFileIcon = (filename: string, mimeType?: string) => {
+    const fn = filename.toLowerCase();
+    if (fn.endsWith('.jpg') || fn.endsWith('.png') || fn.endsWith('.jpeg') || (mimeType && mimeType.startsWith('image/'))) {
       return <ImageIcon size={18} className="text-blue-500" />;
     }
-    if (mimeType.includes('pdf') || mimeType.includes('document')) {
-      return <FileText size={18} className="text-amber-500" />;
+    if (fn.endsWith('.pdf') || (mimeType && mimeType.includes('pdf'))) {
+      return <FileText size={18} className="text-rose-500" />;
     }
     return <File size={18} className="text-gray-500" />;
   };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Paperclip size={18} className="text-gray-600" />
-          <h4 className="font-semibold text-gray-800 text-sm">Allegati ({attachments.length})</h4>
+          <h4 className="font-semibold text-gray-800 text-sm">Allegati Collegati ({attachments.length})</h4>
+          <span className="text-[10px] bg-emerald-50 text-emerald-800 font-medium px-2 py-0.5 rounded border border-emerald-200">
+            Solo collegamenti testuali (nessun file nel database)
+          </span>
         </div>
         {!readOnly && onChange && (
           <div>
@@ -123,165 +110,167 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
               ref={fileInputRef}
               onChange={handleFileChange}
               multiple
-              disabled={isUploading}
               className="hidden"
             />
             <button
               type="button"
-              disabled={isUploading}
               onClick={() => fileInputRef.current?.click()}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                isUploading
-                  ? 'bg-blue-100 text-blue-700 cursor-not-allowed'
-                  : 'bg-blue-50 hover:bg-blue-100 text-blue-700 cursor-pointer'
-              }`}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
-              {isUploading ? (
-                <>
-                  <Loader2 size={16} className="animate-spin text-blue-600" />
-                  <span>Lettura in corso... (max 5s)</span>
-                </>
-              ) : (
-                <>
-                  <Plus size={16} /> Aggiungi allegato
-                </>
-              )}
+              <Plus size={16} /> Aggiungi File
             </button>
           </div>
         )}
       </div>
 
-      {uploadError && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-xs font-medium flex items-center justify-between gap-2 animate-fade-in shadow-xs">
-          <div className="flex items-center gap-2">
-            <AlertTriangle size={18} className="text-red-600 shrink-0" />
-            <span>{uploadError}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setUploadError(null)}
-            className="p-1 text-red-600 hover:text-red-800 rounded hover:bg-red-100 transition-colors cursor-pointer"
-            title="Chiudi avviso"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
-
       {attachments.length === 0 ? (
-        <div className="p-6 border-2 border-dashed border-gray-200 rounded-lg text-center text-gray-500 text-sm">
-          Nessun allegato presente.
+        <div 
+          onClick={() => !readOnly && onChange && fileInputRef.current?.click()}
+          className={`p-6 border-2 border-dashed border-gray-200 rounded-xl text-center text-gray-500 text-sm ${!readOnly && onChange ? 'cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-all' : ''}`}
+        >
+          <Paperclip size={24} className="mx-auto text-gray-400 mb-2" />
+          <p className="font-medium text-gray-700">Nessun file allegato</p>
+          {!readOnly && onChange && (
+            <p className="text-xs text-gray-400 mt-1">Clicca per selezionare un file da qualsiasi posizione</p>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {attachments.map((att) => (
-            <div key={att.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg hover:border-gray-300 transition-all">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="p-2 bg-white rounded-md border border-gray-100 shadow-xs shrink-0">
-                  {getFileIcon(att.mimeType)}
+          {attachments.map((att) => {
+            const displayPath = att.path || `allegati/${att.filename}`;
+            return (
+              <div key={att.id} className="flex flex-col justify-between p-3 bg-gray-50 border border-gray-200 rounded-lg hover:border-blue-300 transition-all gap-2">
+                <div className="flex items-start gap-2.5 min-w-0">
+                  <div className="p-2 bg-white rounded-md border border-gray-200 shadow-2xs shrink-0 mt-0.5">
+                    {getFileIcon(att.filename, att.mimeType)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-gray-900 truncate" title={att.filename}>
+                      {att.filename}
+                    </p>
+                    <p className="text-[11px] text-gray-600 font-mono truncate bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 mt-1" title={displayPath}>
+                      📁 {displayPath}
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {formatFileSize(att.size)} • {att.uploadedAt}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate" title={att.filename}>
-                    {att.filename}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {formatFileSize(att.size)} • {att.uploadedAt}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 shrink-0 ml-2">
-                <button
-                  type="button"
-                  onClick={() => setPreviewingAttachment(att)}
-                  className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-all cursor-pointer"
-                  title="Visualizza anteprima diretta"
-                >
-                  <Eye size={16} />
-                </button>
-                <a
-                  href={att.dataUrl}
-                  download={att.filename}
-                  className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-all"
-                  title="Scarica allegato"
-                >
-                  <Download size={16} />
-                </a>
-                {!readOnly && onChange && (
+
+                <div className="flex items-center justify-between border-t border-gray-200 pt-2 mt-1">
                   <button
                     type="button"
-                    onClick={() => handleDelete(att.id)}
-                    className="p-1.5 text-gray-600 hover:text-rose-600 hover:bg-rose-50 rounded transition-all"
-                    title="Elimina allegato"
+                    onClick={() => handleCopyPath(displayPath, att.id)}
+                    className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-blue-600 transition-colors cursor-pointer"
+                    title="Copia percorso NAS"
                   >
-                    <Trash2 size={16} />
+                    {copiedId === att.id ? (
+                      <>
+                        <Check size={14} className="text-emerald-600" />
+                        <span className="text-emerald-600 font-bold">Copiato!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} />
+                        <span>Copia Percorso</span>
+                      </>
+                    )}
                   </button>
-                )}
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewingAttachment(att)}
+                      className="flex items-center gap-1 px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded transition-all cursor-pointer border border-indigo-200"
+                      title="Visualizza Anteprima"
+                    >
+                      <Eye size={14} /> Anteprima
+                    </button>
+
+                    {!readOnly && onChange && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(att.id)}
+                        className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-all cursor-pointer"
+                        title="Rimuovi collegamento"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Modal Anteprima Allegato */}
+      {/* Modal Anteprima File */}
       {previewingAttachment && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-fade-in">
-          <div className="bg-white rounded-xl shadow-2xl border border-gray-300 w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh]">
-            <div className="bg-gray-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-2xs flex items-center justify-center p-4 z-[9999] animate-fade-in">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-300 w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-gray-900 text-white px-5 py-3.5 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <Paperclip size={18} className="text-amber-400 shrink-0" />
-                <h3 className="text-base font-bold truncate text-white" title={previewingAttachment.filename}>
+                <h3 className="text-sm font-bold truncate text-white" title={previewingAttachment.filename}>
                   Anteprima: {previewingAttachment.filename}
                 </h3>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <a
-                  href={previewingAttachment.dataUrl}
-                  download={previewingAttachment.filename}
-                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold transition-all"
-                >
-                  <Download size={14} /> Scarica
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setPreviewingAttachment(null)}
-                  className="p-1 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-all cursor-pointer"
-                  title="Chiudi"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewingAttachment(null)}
+                className="text-gray-300 hover:text-white transition-all cursor-pointer"
+              >
+                <X size={20} />
+              </button>
             </div>
 
-            <div className="p-4 bg-gray-100 flex-1 overflow-auto flex items-center justify-center min-h-[500px]">
-              {previewingAttachment.mimeType?.includes('pdf') ||
-              previewingAttachment.dataUrl?.startsWith('data:application/pdf') ||
-              previewingAttachment.filename.toLowerCase().endsWith('.pdf') ? (
-                <iframe
-                  src={previewingAttachment.dataUrl}
-                  title={previewingAttachment.filename}
-                  className="w-full h-[75vh] rounded-lg border border-gray-300 bg-white shadow-sm"
-                />
-              ) : previewingAttachment.mimeType?.startsWith('image/') ||
-                previewingAttachment.dataUrl?.startsWith('data:image/') ||
-                /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(previewingAttachment.filename) ? (
-                <img
-                  src={previewingAttachment.dataUrl}
-                  alt={previewingAttachment.filename}
-                  className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-md border border-gray-200"
-                />
-              ) : (
-                <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-gray-200 space-y-4">
-                  <FileText size={48} className="mx-auto text-gray-400" />
-                  <p className="text-gray-700 font-medium">
-                    Anteprima non disponibile per questo tipo di file.
+            <div className="p-6 bg-gray-50 flex-1 overflow-auto space-y-4">
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">File Collegato</p>
+                  <p className="text-sm font-bold text-gray-900">{previewingAttachment.filename}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Percorso NAS</p>
+                  <p className="text-xs font-mono bg-gray-100 px-2 py-1 rounded border border-gray-200 text-gray-800">
+                    {previewingAttachment.path || `allegati/${previewingAttachment.filename}`}
                   </p>
-                  <a
-                    href={previewingAttachment.dataUrl}
-                    download={previewingAttachment.filename}
-                    className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700"
+                </div>
+              </div>
+
+              {previewingAttachment.dataUrl && previewingAttachment.dataUrl.startsWith('blob:') ? (
+                <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-2xs">
+                  {previewingAttachment.filename.toLowerCase().endsWith('.pdf') ? (
+                    <iframe
+                      src={previewingAttachment.dataUrl}
+                      title={previewingAttachment.filename}
+                      className="w-full h-[60vh] rounded-lg border border-gray-200 bg-white"
+                    />
+                  ) : (
+                    <img
+                      src={previewingAttachment.dataUrl}
+                      alt={previewingAttachment.filename}
+                      className="max-h-[60vh] max-w-full object-contain mx-auto rounded-lg"
+                    />
+                  )}
+                </div>
+              ) : (
+                <div className="p-8 bg-white rounded-xl border border-gray-200 text-center space-y-3">
+                  <FileText size={48} className="mx-auto text-blue-500" />
+                  <p className="text-base font-bold text-gray-800">
+                    {previewingAttachment.filename}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Il file risiede nel NAS locale al percorso: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800 font-mono">{previewingAttachment.path || `allegati/${previewingAttachment.filename}`}</code>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPath(previewingAttachment.path || `allegati/${previewingAttachment.filename}`, previewingAttachment.id)}
+                    className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs mt-2"
                   >
-                    <Download size={16} /> Scarica il file ({previewingAttachment.filename})
-                  </a>
+                    <Copy size={15} /> Copia Percorso NAS
+                  </button>
                 </div>
               )}
             </div>

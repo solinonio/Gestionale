@@ -47,10 +47,39 @@ const getLocalStorageItem = <T,>(key: string, defaultValue: T): T => {
   }
 };
 
+const stripBase64FromValue = (data: any): any => {
+  if (!data || typeof data !== 'object') return data;
+  if (Array.isArray(data)) return data.map(stripBase64FromValue);
+
+  const copy = { ...data };
+  if (Array.isArray(copy.allegati)) {
+    copy.allegati = copy.allegati.map((att: any) => {
+      if (!att || typeof att !== 'object') return att;
+      const cleanAtt = { ...att };
+      // Strip Base64 dataUrls before sending to DB/server
+      if (cleanAtt.dataUrl && cleanAtt.dataUrl.startsWith('data:')) {
+        delete cleanAtt.dataUrl;
+      }
+      if (!cleanAtt.path && cleanAtt.filename) {
+        cleanAtt.path = `allegati/${cleanAtt.filename}`;
+      }
+      return cleanAtt;
+    });
+  }
+
+  for (const k in copy) {
+    if (Object.prototype.hasOwnProperty.call(copy, k) && copy[k] && typeof copy[k] === 'object' && k !== 'allegati') {
+      copy[k] = stripBase64FromValue(copy[k]);
+    }
+  }
+  return copy;
+};
+
 const setLocalStorageItem = async <T,>(key: string, value: T): Promise<void> => {
-  inMemoryStore[key] = value;
+  const sanitizedValue = stripBase64FromValue(value);
+  inMemoryStore[key] = sanitizedValue;
   try {
-    safeSetItem(key, JSON.stringify(value));
+    safeSetItem(key, JSON.stringify(sanitizedValue));
   } catch (e) {
     console.warn(`Could not persist ${key} to localStorage, kept in memory and saving to server file:`, e);
   }
@@ -59,7 +88,7 @@ const setLocalStorageItem = async <T,>(key: string, value: T): Promise<void> => 
     const response = await fetch('/api/local-db', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [key]: value })
+      body: JSON.stringify({ [key]: sanitizedValue })
     });
     if (!response.ok) {
       console.warn(`Server responded with status ${response.status} when saving ${key}`);

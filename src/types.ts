@@ -21,8 +21,9 @@ export interface Attachment {
   filename: string;
   mimeType: string;
   size: number;
-  dataUrl: string;
   uploadedAt: string;
+  path?: string; // Percorso del file sul NAS (es. "allegati/nomefile.pdf" o "X:\NAS\file.pdf")
+  dataUrl?: string; // Utilizzato SOLO in memoria locale di sessione (blob URL)
 }
 
 export interface Client {
