@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getClients, addClient, updateClient, getQuotationsByClient, deleteClient } from '../lib/db';
+import { getClients, addClient, updateClient, getQuotationsByClient, deleteClient, saveQuotation, getCompanyProfile } from '../lib/db';
 import { Client, Quotation, Attachment } from '../types';
-import { Plus, Search, Loader2, Trash2, Check, Paperclip } from 'lucide-react';
+import { Plus, Search, Loader2, Trash2, Check, Paperclip, FileText, CheckCircle2, Calendar, Hash, Euro, FilePlus } from 'lucide-react';
 import QuotationForm from './QuotationForm';
 import AttachmentManager from './AttachmentManager';
 
@@ -52,6 +52,111 @@ export default function ClientManager({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterLetter, setFilterLetter] = useState<string | null>(null);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+
+  // State per Creazione Preventivo Rapido con Allegato
+  const [showQuickQuoteForm, setShowQuickQuoteForm] = useState(false);
+  const [quickQuoteDate, setQuickQuoteDate] = useState(new Date().toISOString().split('T')[0]);
+  const [quickQuoteProgressivo, setQuickQuoteProgressivo] = useState('');
+  const [quickQuoteAmount, setQuickQuoteAmount] = useState('');
+  const [quickQuoteAllegati, setQuickQuoteAllegati] = useState<Attachment[]>([]);
+  const [isSavingQuickQuote, setIsSavingQuickQuote] = useState(false);
+  const [quickQuoteSuccessMsg, setQuickQuoteSuccessMsg] = useState<string | null>(null);
+
+  const handleClientAttachmentsChange = async (newAttachments: Attachment[]) => {
+    if (!selectedClient) return;
+    const updatedClient: Client = { ...selectedClient, allegati: newAttachments };
+    try {
+      await updateClient(selectedClient.id, updatedClient);
+      setSelectedClient(updatedClient);
+      setClients(prev => prev.map(c => c.id === selectedClient.id ? updatedClient : c));
+    } catch (err) {
+      console.error("Errore nell'aggiornamento degli allegati del cliente:", err);
+    }
+  };
+
+  const handleSaveQuickQuote = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClient) return;
+
+    if (!quickQuoteProgressivo.trim()) {
+      alert("Inserisci il progressivo del preventivo (es. 15 oppure 15/2026).");
+      return;
+    }
+
+    const amountNum = parseFloat(quickQuoteAmount);
+    if (isNaN(amountNum)) {
+      alert("Inserisci un importo valido per il preventivo.");
+      return;
+    }
+
+    setIsSavingQuickQuote(true);
+    try {
+      let parsedNumber = quickQuoteProgressivo.trim();
+      let parsedYear = new Date().getFullYear();
+
+      if (parsedNumber.includes('/')) {
+        const parts = parsedNumber.split('/');
+        parsedNumber = parts[0].trim();
+        const yrStr = parts[1].trim();
+        if (yrStr.length === 2) {
+          parsedYear = 2000 + parseInt(yrStr);
+        } else if (yrStr.length === 4) {
+          parsedYear = parseInt(yrStr);
+        }
+      }
+
+      const company = (await getCompanyProfile()) || {
+        name: '',
+        address: '',
+        cap: '',
+        city: '',
+        phone: '',
+        email: '',
+        vatNumber: '',
+        sdiCode: '',
+        pec: '',
+        presentationText: '',
+        conditionsText: ''
+      };
+
+      const newQuot: Omit<Quotation, 'id'> = {
+        clientId: selectedClient.id,
+        number: parsedNumber,
+        year: parsedYear,
+        date: quickQuoteDate,
+        status: 'SENT',
+        totalAmount: amountNum,
+        companyInfo: company,
+        clientInfo: selectedClient,
+        rows: [],
+        notes: 'Preventivo creato da Anagrafica Cliente',
+        internalNotes: '',
+        internalRows: [],
+        condizioni: '',
+        presentationText: '',
+        allegati: quickQuoteAllegati
+      };
+
+      await saveQuotation(newQuot);
+
+      // Refresh list of quotations for this client
+      const updatedQuotations = await getQuotationsByClient(selectedClient.id);
+      setQuotations(updatedQuotations);
+
+      // Reset Quick Quote Form
+      setQuickQuoteProgressivo('');
+      setQuickQuoteAmount('');
+      setQuickQuoteAllegati([]);
+      setShowQuickQuoteForm(false);
+      setQuickQuoteSuccessMsg(`Preventivo ${parsedNumber}/${parsedYear} salvato e abbinato con successo!`);
+      setTimeout(() => setQuickQuoteSuccessMsg(null), 4000);
+    } catch (err) {
+      console.error("Errore durante il salvataggio del preventivo rapido:", err);
+      alert("Errore durante il salvataggio del preventivo.");
+    } finally {
+      setIsSavingQuickQuote(false);
+    }
+  };
 
   useEffect(() => {
     if (initialSelectedClientId && clients.length > 0) {
@@ -389,40 +494,207 @@ export default function ClientManager({
         </table>
       </div>
       {selectedClient && (
-          <div className="mt-8 space-y-6">
-              <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
-                  <h4 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-                    <Paperclip size={18} /> Allegati di {selectedClient.name || selectedClient.intestazione}
-                  </h4>
-                  <AttachmentManager
-                      attachments={selectedClient.allegati || []}
-                      readOnly={true}
-                  />
-              </div>
-
-              <div>
-                  <h4 className="font-bold text-lg mb-4">Preventivi di {selectedClient.name || selectedClient.intestazione}</h4>
-                  <button onClick={() => { setEditingQuotation(null); setIsCreating(true); }} className="text-blue-600 mb-2">+ Nuovo Preventivo</button>
-                  <table className="w-full text-left border-collapse border border-gray-200">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
-                          <th className="px-4 py-3 font-semibold text-gray-700">Preventivo</th>
-                          <th className="px-4 py-3 font-semibold text-gray-700">Data</th>
-                          <th className="px-4 py-3 font-semibold text-gray-700">Importo</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                          {quotations.map((q, index) => (
-                              <tr key={`${q.id}-${index}`} onClick={() => { setEditingQuotation(q); setIsCreating(true); }} className="cursor-pointer hover:bg-blue-50 border-b border-gray-200">
-                                  <td className="px-4 py-3">{q.number}/{q.year % 100}</td>
-                                  <td className="px-4 py-3">{q.date}</td>
-                                  <td className="px-4 py-3">€{q.totalAmount.toFixed(2)}</td>
-                              </tr>
-                          ))}
-                      </tbody>
-                  </table>
-              </div>
+        <div className="mt-8 space-y-6">
+          {/* Scheda Allegati del Cliente */}
+          <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <h4 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                <Paperclip size={20} className="text-blue-600" />
+                Scheda Allegati Cliente: <span className="text-blue-700">{selectedClient.name || selectedClient.intestazione}</span>
+              </h4>
+              <span className="text-xs text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full font-medium">
+                Gestione file salvati in anagrafica
+              </span>
+            </div>
+            
+            <AttachmentManager
+              attachments={selectedClient.allegati || []}
+              onChange={handleClientAttachmentsChange}
+              readOnly={false}
+            />
           </div>
+
+          {/* Sezione Preventivi & Creazione Nuovo Preventivo Rapido */}
+          <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+              <div>
+                <h4 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                  <FileText size={20} className="text-amber-600" />
+                  Preventivi di {selectedClient.name || selectedClient.intestazione}
+                </h4>
+                <p className="text-xs text-gray-500 mt-0.5">Gestisci i preventivi esistenti o abbina un nuovo preventivo con allegati</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowQuickQuoteForm(!showQuickQuoteForm)}
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold px-4 py-2 rounded-lg text-sm shadow-sm transition-all cursor-pointer"
+                >
+                  <Plus size={16} /> {showQuickQuoteForm ? 'Chiudi Form Rapido' : '+ Crea Preventivo con Allegato'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEditingQuotation(null); setIsCreating(true); }}
+                  className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-3 py-2 rounded-lg text-sm transition-all cursor-pointer"
+                >
+                  + Editor Completo
+                </button>
+              </div>
+            </div>
+
+            {quickQuoteSuccessMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm font-medium flex items-center gap-2 animate-fade-in">
+                <CheckCircle2 size={18} className="text-emerald-600" />
+                {quickQuoteSuccessMsg}
+              </div>
+            )}
+
+            {/* Form Creazione Preventivo Rapido con Allegato */}
+            {showQuickQuoteForm && (
+              <form onSubmit={handleSaveQuickQuote} className="p-5 bg-gradient-to-br from-slate-50 to-blue-50/40 border border-blue-200 rounded-xl space-y-4 shadow-inner">
+                <div className="flex items-center justify-between border-b border-blue-200/60 pb-2">
+                  <h5 className="font-bold text-base text-gray-900 flex items-center gap-2">
+                    <FilePlus size={18} className="text-blue-600" />
+                    Nuovo Preventivo da Abbinare al Cliente
+                  </h5>
+                  <span className="text-xs text-blue-700 font-medium bg-blue-100/80 px-2 py-0.5 rounded">
+                    Creazione Rapida
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1 flex items-center gap-1">
+                      <Calendar size={13} className="text-gray-500" /> Data Preventivo
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={quickQuoteDate}
+                      onChange={e => setQuickQuoteDate(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1 flex items-center gap-1">
+                      <Hash size={13} className="text-gray-500" /> Progressivo (N° o N°/Anno)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Es. 15 oppure 15/2026"
+                      value={quickQuoteProgressivo}
+                      onChange={e => setQuickQuoteProgressivo(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1 flex items-center gap-1">
+                      <Euro size={13} className="text-gray-500" /> Importo Totale (€)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      placeholder="0.00"
+                      value={quickQuoteAmount}
+                      onChange={e => setQuickQuoteAmount(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-lg p-2 text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-gray-200/80 space-y-2">
+                  <label className="block text-xs font-bold text-gray-700 uppercase">
+                    Allegato / File del Preventivo
+                  </label>
+                  <p className="text-xs text-gray-500">
+                    Carica i file PDF o le immagini associate a questo preventivo (funzionalità identica alla pagina preventivi).
+                  </p>
+                  <div className="bg-white p-3 rounded-lg border border-gray-200">
+                    <AttachmentManager
+                      attachments={quickQuoteAllegati}
+                      onChange={setQuickQuoteAllegati}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickQuoteForm(false)}
+                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-semibold transition-all cursor-pointer"
+                  >
+                    Annulla
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingQuickQuote}
+                    className="flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold shadow transition-all cursor-pointer"
+                  >
+                    {isSavingQuickQuote ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                    Salva e Abbina al Cliente
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Tabella Preventivi del Cliente */}
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-4 py-3 font-semibold text-gray-700 text-sm">Preventivo</th>
+                    <th className="px-4 py-3 font-semibold text-gray-700 text-sm">Data</th>
+                    <th className="px-4 py-3 font-semibold text-gray-700 text-sm">Importo</th>
+                    <th className="px-4 py-3 font-semibold text-gray-700 text-sm">Allegati</th>
+                    <th className="px-4 py-3 font-semibold text-gray-700 text-sm text-right">Azione</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {quotations.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-gray-500 text-sm">
+                        Nessun preventivo presente per questo cliente.
+                      </td>
+                    </tr>
+                  ) : (
+                    quotations.map((q, index) => (
+                      <tr key={`${q.id}-${index}`} className="hover:bg-blue-50/60 border-b border-gray-200 transition-colors">
+                        <td className="px-4 py-3 font-medium text-gray-900">
+                          N° {q.number}/{q.year % 100}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{q.date}</td>
+                        <td className="px-4 py-3 font-semibold text-gray-900">
+                          €{(q.totalAmount || 0).toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3">
+                          {q.allegati && q.allegati.length > 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full text-xs font-semibold">
+                              <Paperclip size={12} /> {q.allegati.length} file
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">Nessun file</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => { setEditingQuotation(q); setIsCreating(true); }}
+                            className="text-blue-600 hover:text-blue-800 font-semibold text-sm cursor-pointer"
+                          >
+                            Apri / Modifica
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Registry Search Preview Popup Modal */}

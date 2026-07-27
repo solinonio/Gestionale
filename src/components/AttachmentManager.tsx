@@ -1,6 +1,6 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Attachment } from '../types';
-import { Paperclip, Download, Trash2, File, FileText, Image as ImageIcon, Plus } from 'lucide-react';
+import { Paperclip, Download, Trash2, File, FileText, Image as ImageIcon, Plus, Eye, X } from 'lucide-react';
 
 interface AttachmentManagerProps {
   attachments?: Attachment[];
@@ -10,6 +10,7 @@ interface AttachmentManagerProps {
 
 export default function AttachmentManager({ attachments = [], onChange, readOnly = false }: AttachmentManagerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewingAttachment, setPreviewingAttachment] = useState<Attachment | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -126,6 +127,14 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0 ml-2">
+                <button
+                  type="button"
+                  onClick={() => setPreviewingAttachment(att)}
+                  className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded transition-all cursor-pointer"
+                  title="Visualizza anteprima diretta"
+                >
+                  <Eye size={16} />
+                </button>
                 <a
                   href={att.dataUrl}
                   download={att.filename}
@@ -147,6 +156,73 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Modal Anteprima Allegato */}
+      {previewingAttachment && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-[9999] animate-fade-in">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-300 w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="bg-gray-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <Paperclip size={18} className="text-amber-400 shrink-0" />
+                <h3 className="text-base font-bold truncate text-white" title={previewingAttachment.filename}>
+                  Anteprima: {previewingAttachment.filename}
+                </h3>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <a
+                  href={previewingAttachment.dataUrl}
+                  download={previewingAttachment.filename}
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold transition-all"
+                >
+                  <Download size={14} /> Scarica
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewingAttachment(null)}
+                  className="p-1 text-gray-300 hover:text-white hover:bg-gray-800 rounded transition-all cursor-pointer"
+                  title="Chiudi"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-100 flex-1 overflow-auto flex items-center justify-center min-h-[500px]">
+              {previewingAttachment.mimeType?.includes('pdf') ||
+              previewingAttachment.dataUrl?.startsWith('data:application/pdf') ||
+              previewingAttachment.filename.toLowerCase().endsWith('.pdf') ? (
+                <iframe
+                  src={previewingAttachment.dataUrl}
+                  title={previewingAttachment.filename}
+                  className="w-full h-[75vh] rounded-lg border border-gray-300 bg-white shadow-sm"
+                />
+              ) : previewingAttachment.mimeType?.startsWith('image/') ||
+                previewingAttachment.dataUrl?.startsWith('data:image/') ||
+                /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(previewingAttachment.filename) ? (
+                <img
+                  src={previewingAttachment.dataUrl}
+                  alt={previewingAttachment.filename}
+                  className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-md border border-gray-200"
+                />
+              ) : (
+                <div className="text-center p-8 bg-white rounded-xl shadow-sm border border-gray-200 space-y-4">
+                  <FileText size={48} className="mx-auto text-gray-400" />
+                  <p className="text-gray-700 font-medium">
+                    Anteprima non disponibile per questo tipo di file.
+                  </p>
+                  <a
+                    href={previewingAttachment.dataUrl}
+                    download={previewingAttachment.filename}
+                    className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700"
+                  >
+                    <Download size={16} /> Scarica il file ({previewingAttachment.filename})
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
