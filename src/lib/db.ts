@@ -69,18 +69,23 @@ const setLocalStorageItem = async <T,>(key: string, value: T): Promise<void> => 
   }
 };
 
+let isSyncing = false;
 let lastSyncTime = 0;
-const SYNC_COOLDOWN = 1500; // 1.5 seconds cooldown
+const SYNC_COOLDOWN = 2000; // 2 seconds cooldown
 
 let currentDbStatus: { dbType: 'mariadb' | 'mariadb-fallback' | 'json'; fallbackReason?: string } = { dbType: 'json' };
 
 export const getDbStatus = () => currentDbStatus;
 
 export const syncWithServer = async (force: boolean = false): Promise<void> => {
+  if (isSyncing) return;
   const now = Date.now();
   if (!force && now - lastSyncTime < SYNC_COOLDOWN) {
     return;
   }
+  isSyncing = true;
+  lastSyncTime = now;
+
   try {
     const res = await fetch('/api/local-db');
     if (!res.ok) {
@@ -115,20 +120,28 @@ export const syncWithServer = async (force: boolean = false): Promise<void> => {
             const localVal = getLocalStorageItem<any[]>(key, []);
             const mergedMap = new Map<string, any>();
 
-            // First add all items from fileVal (server data)
-            for (const item of fileVal) {
-              if (item && item.id) {
-                mergedMap.set(String(item.id), item);
+            // 1. Populate map with localVal first to retain local updates
+            if (Array.isArray(localVal)) {
+              for (const item of localVal) {
+                if (item && item.id) {
+                  mergedMap.set(String(item.id), item);
+                }
               }
             }
 
-            // Then add local items if not present in server data
-            let localOnlyFound = false;
-            if (Array.isArray(localVal)) {
-              for (const item of localVal) {
-                if (item && item.id && !mergedMap.has(String(item.id))) {
+            // 2. Merge server data, ensuring allegati aren't wiped out if server payload lacks them
+            for (const item of fileVal) {
+              if (item && item.id) {
+                const existing = mergedMap.get(String(item.id));
+                if (existing) {
+                  const mergedItem = { ...existing, ...item };
+                  // If local item has attachments but server item returned empty attachments, preserve local ones
+                  if (Array.isArray(existing.allegati) && existing.allegati.length > 0 && (!Array.isArray(item.allegati) || item.allegati.length === 0)) {
+                    mergedItem.allegati = existing.allegati;
+                  }
+                  mergedMap.set(String(item.id), mergedItem);
+                } else {
                   mergedMap.set(String(item.id), item);
-                  localOnlyFound = true;
                 }
               }
             }
@@ -143,10 +156,6 @@ export const syncWithServer = async (force: boolean = false): Promise<void> => {
             }
             safeSetItem(key, mergedValStr);
 
-            if (localOnlyFound) {
-              payloadToSave[key] = mergedList;
-              needsSaveToServer = true;
-            }
           } else {
             const currentValStr = JSON.stringify(inMemoryStore[key]);
             const fileValStr = JSON.stringify(fileVal);
@@ -183,7 +192,6 @@ export const syncWithServer = async (force: boolean = false): Promise<void> => {
           body: JSON.stringify(payloadToSave)
         });
       }
-      lastSyncTime = now;
     }
   } catch (err: any) {
     console.warn('Sincronizzazione con il server non riuscita, uso cache locale:', err);
@@ -191,6 +199,8 @@ export const syncWithServer = async (force: boolean = false): Promise<void> => {
       currentDbStatus = { dbType: 'json', fallbackReason: err.message };
       window.dispatchEvent(new CustomEvent('database-status-updated'));
     }
+  } finally {
+    isSyncing = false;
   }
 };
 
@@ -259,7 +269,6 @@ export const saveQuotation = async (quotation: Omit<Quotation, 'id'>) => {
   
   // Save locally and push to server
   await setLocalStorageItem('quotations', updatedList);
-  await syncWithServer(true); // Force push
   
   window.dispatchEvent(new CustomEvent('database-synced'));
   console.log("saveQuotation successful:", newQuotation.id);
@@ -289,7 +298,6 @@ export const updateQuotation = async (quotationId: string, quotation: Omit<Quota
   }
   
   await setLocalStorageItem('quotations', updatedList);
-  await syncWithServer(true); // Push changes
   window.dispatchEvent(new CustomEvent('database-synced'));
 };
 
@@ -298,7 +306,6 @@ export const deleteQuotation = async (quotationId: string) => {
   const currentList = getLocalStorageItem<Quotation[]>('quotations', []);
   const filtered = currentList.filter(q => q.id !== quotationId);
   await setLocalStorageItem('quotations', filtered);
-  await syncWithServer(true); // Push deletion
   window.dispatchEvent(new CustomEvent('database-synced'));
 };
 
@@ -334,7 +341,7 @@ export const addClient = async (client: Omit<Client, 'id'>) => {
   const newClient = { ...client, id: generateId() };
   clients.push(newClient);
   await setLocalStorageItem('clients', clients);
-  await syncWithServer(true); // Push immediately
+  window.dispatchEvent(new CustomEvent('database-synced'));
   return { id: newClient.id };
 };
 
@@ -352,7 +359,7 @@ export const updateClient = async (clientId: string, client: Omit<Client, 'id'>)
     clients.push(newClient);
     await setLocalStorageItem('clients', clients);
   }
-  await syncWithServer(true); // Push changes
+  window.dispatchEvent(new CustomEvent('database-synced'));
 };
 
 // Default Laser Processing data (initial state)

@@ -760,10 +760,20 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
             allegati: allegati
         };
 
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout (5s): il salvataggio del preventivo ha superato i 5 secondi. Se hai allegato file pesanti, riprova con file più leggeri.")), 5000)
+        );
+
         if (props.editingQuotation && props.editingQuotation.id) {
-            await updateQuotation(props.editingQuotation.id, quotation);
+            await Promise.race([
+                updateQuotation(props.editingQuotation.id, quotation),
+                timeoutPromise
+            ]);
         } else {
-            await saveQuotation(quotation);
+            await Promise.race([
+                saveQuotation(quotation),
+                timeoutPromise
+            ]);
         }
         
         alert(`Preventivo ${finalNumber}/${quotationYear % 100} salvato con successo!`);

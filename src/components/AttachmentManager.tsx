@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Attachment } from '../types';
-import { Paperclip, Download, Trash2, File, FileText, Image as ImageIcon, Plus, Eye, X } from 'lucide-react';
+import { Paperclip, Download, Trash2, File, FileText, Image as ImageIcon, Plus, Eye, X, Loader2, AlertTriangle } from 'lucide-react';
 
 interface AttachmentManagerProps {
   attachments?: Attachment[];
@@ -11,46 +11,77 @@ interface AttachmentManagerProps {
 export default function AttachmentManager({ attachments = [], onChange, readOnly = false }: AttachmentManagerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewingAttachment, setPreviewingAttachment] = useState<Attachment | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const readFileWithTimeout = (file: File, index: number, timeoutMs: number = 5000): Promise<Attachment> => {
+    return new Promise<Attachment>((resolve, reject) => {
+      const reader = new FileReader();
+
+      const timer = setTimeout(() => {
+        try {
+          reader.abort();
+        } catch (e) {
+          // ignore abort errors
+        }
+        reject(new Error(`Timeout caricamento (5s): Il file "${file.name}" ha impiegato più di 5 secondi. Il file potrebbe essere troppo grande.`));
+      }, timeoutMs);
+
+      reader.onload = (uploadEvent) => {
+        clearTimeout(timer);
+        const dataUrl = uploadEvent.target?.result as string;
+        if (dataUrl) {
+          resolve({
+            id: `${Date.now()}-${index}-${Math.random().toString(36).substring(2, 7)}`,
+            filename: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            size: file.size,
+            dataUrl,
+            uploadedAt: new Date().toLocaleDateString('it-IT') + ' ' + new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+          });
+        } else {
+          reject(new Error(`Lettura del file "${file.name}" fallita.`));
+        }
+      };
+
+      reader.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error(`Errore durante la lettura del file "${file.name}".`));
+      };
+
+      reader.onabort = () => {
+        clearTimeout(timer);
+        reject(new Error(`Lettura del file "${file.name}" annullata per timeout (5s).`));
+      };
+
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !onChange) return;
 
     const fileList = Array.from(files);
-    
-    Promise.all(
-      fileList.map((file: File, index: number) => {
-        return new Promise<Attachment>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (uploadEvent) => {
-            const dataUrl = uploadEvent.target?.result as string;
-            if (dataUrl) {
-              resolve({
-                id: `${Date.now()}-${index}-${Math.random().toString(36).substring(2, 7)}`,
-                filename: file.name,
-                mimeType: file.type || 'application/octet-stream',
-                size: file.size,
-                dataUrl,
-                uploadedAt: new Date().toLocaleDateString('it-IT') + ' ' + new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
-              });
-            } else {
-              reject(new Error('Failed to read file'));
-            }
-          };
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(file);
-        });
-      })
-    ).then((addedAttachments) => {
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      const addedAttachments = await Promise.all(
+        fileList.map((file: File, index: number) => readFileWithTimeout(file, index, 5000))
+      );
+
       if (onChange) {
         onChange([...attachments, ...addedAttachments]);
       }
-    }).catch((err) => {
-      console.error('Errore durante la lettura degli allegati:', err);
-    });
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    } catch (err: any) {
+      console.error('Errore/Timeout caricamento allegati:', err);
+      setUploadError(err.message || 'Errore o timeout durante il caricamento del file.');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -92,18 +123,50 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
               ref={fileInputRef}
               onChange={handleFileChange}
               multiple
+              disabled={isUploading}
               className="hidden"
             />
             <button
               type="button"
+              disabled={isUploading}
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                isUploading
+                  ? 'bg-blue-100 text-blue-700 cursor-not-allowed'
+                  : 'bg-blue-50 hover:bg-blue-100 text-blue-700 cursor-pointer'
+              }`}
             >
-              <Plus size={16} /> Aggiungi allegato
+              {isUploading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin text-blue-600" />
+                  <span>Lettura in corso... (max 5s)</span>
+                </>
+              ) : (
+                <>
+                  <Plus size={16} /> Aggiungi allegato
+                </>
+              )}
             </button>
           </div>
         )}
       </div>
+
+      {uploadError && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-xs font-medium flex items-center justify-between gap-2 animate-fade-in shadow-xs">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={18} className="text-red-600 shrink-0" />
+            <span>{uploadError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            className="p-1 text-red-600 hover:text-red-800 rounded hover:bg-red-100 transition-colors cursor-pointer"
+            title="Chiudi avviso"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {attachments.length === 0 ? (
         <div className="p-6 border-2 border-dashed border-gray-200 rounded-lg text-center text-gray-500 text-sm">

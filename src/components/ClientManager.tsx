@@ -66,11 +66,18 @@ export default function ClientManager({
     if (!selectedClient) return;
     const updatedClient: Client = { ...selectedClient, allegati: newAttachments };
     try {
-      await updateClient(selectedClient.id, updatedClient);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout (5s): il salvataggio degli allegati ha superato i 5 secondi. Il sistema è stato sbloccato. Riprova.")), 5000)
+      );
+      await Promise.race([
+        updateClient(selectedClient.id, updatedClient),
+        timeoutPromise
+      ]);
       setSelectedClient(updatedClient);
       setClients(prev => prev.map(c => c.id === selectedClient.id ? updatedClient : c));
-    } catch (err) {
-      console.error("Errore nell'aggiornamento degli allegati del cliente:", err);
+    } catch (err: any) {
+      console.error("Errore/Timeout nell'aggiornamento degli allegati del cliente:", err);
+      alert(err.message || "Errore durante il salvataggio degli allegati.");
     }
   };
 
@@ -137,7 +144,14 @@ export default function ClientManager({
         allegati: quickQuoteAllegati
       };
 
-      await saveQuotation(newQuot);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout (5s): il salvataggio del preventivo ha superato i 5 secondi. L'allegato potrebbe essere troppo grande. Il sistema è stato sbloccato.")), 5000)
+      );
+
+      await Promise.race([
+        saveQuotation(newQuot),
+        timeoutPromise
+      ]);
 
       // Refresh list of quotations for this client
       const updatedQuotations = await getQuotationsByClient(selectedClient.id);
@@ -150,9 +164,9 @@ export default function ClientManager({
       setShowQuickQuoteForm(false);
       setQuickQuoteSuccessMsg(`Preventivo ${parsedNumber}/${parsedYear} salvato e abbinato con successo!`);
       setTimeout(() => setQuickQuoteSuccessMsg(null), 4000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Errore durante il salvataggio del preventivo rapido:", err);
-      alert("Errore durante il salvataggio del preventivo.");
+      alert(err.message || "Errore durante il salvataggio del preventivo.");
     } finally {
       setIsSavingQuickQuote(false);
     }
@@ -228,11 +242,15 @@ export default function ClientManager({
   };
 
   useEffect(() => {
-    console.log('Fetching clients in ClientManager...');
     const loadClients = () => {
-      getClients().then(clients => {
-        console.log('Clients fetched in ClientManager:', clients);
-        setClients(clients);
+      getClients().then(fetchedClients => {
+        setClients(fetchedClients);
+        if (selectedClient) {
+          const current = fetchedClients.find(c => c.id === selectedClient.id);
+          if (current) {
+            setSelectedClient(current);
+          }
+        }
       });
     };
     loadClients();
@@ -241,7 +259,7 @@ export default function ClientManager({
     return () => {
       window.removeEventListener('database-synced', loadClients);
     };
-  }, []);
+  }, [selectedClient]);
 
   useEffect(() => {
     if (sessionStorage.getItem('open_new_client_form') === 'true') {
