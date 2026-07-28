@@ -91,14 +91,22 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
     };
   }, [previewingAttachment]);
 
-  // Connessione guidata alla cartella locale/NAS
+  // Connessione guidata alla cartella locale/NAS ed eventuale impostazione radice
   const handleConnectFolder = async () => {
     const handle = await connectNasFolder();
-    if (handle && previewingAttachment) {
-      const relPath = previewingAttachment.path || previewingAttachment.filename;
-      const file = await getFileFromNas(relPath);
-      if (file) {
-        setNasLiveUrl(URL.createObjectURL(file));
+    if (handle) {
+      if (handle.name) {
+        const autoSuggested = `\\\\192.168.0.123\\${handle.name}`;
+        if (!localStorage.getItem('nas_local_root')) {
+          handleSavePcNasRoot(autoSuggested);
+        }
+      }
+      if (previewingAttachment) {
+        const relPath = previewingAttachment.path || previewingAttachment.filename;
+        const file = await getFileFromNas(relPath);
+        if (file) {
+          setNasLiveUrl(URL.createObjectURL(file));
+        }
       }
     }
   };
@@ -243,39 +251,88 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
 
       {/* Pannello Configurazione Radice NAS del PC */}
       {showPcNasConfig && (
-        <div className="p-3.5 bg-blue-50/90 border border-blue-200 rounded-lg text-xs text-blue-900 space-y-2.5 animate-fade-in">
+        <div className="p-4 bg-blue-50/90 border border-blue-200 rounded-xl text-xs text-blue-900 space-y-3 animate-fade-in shadow-2xs">
           <div className="flex items-center justify-between font-bold">
-            <span className="flex items-center gap-1.5">
-              <Settings size={14} className="text-blue-600" />
-              Impostazione Percorso NAS Locale per questo PC (Soluzione 2):
+            <span className="flex items-center gap-1.5 text-sm text-blue-950">
+              <Settings size={16} className="text-blue-600" />
+              Configurazione Radice NAS per questo PC:
             </span>
             <button
               type="button"
               onClick={() => setShowPcNasConfig(false)}
-              className="text-blue-600 hover:text-blue-800 font-bold"
+              className="text-blue-600 hover:text-blue-800 font-bold p-1 rounded cursor-pointer"
             >
-              <X size={14} />
+              <X size={16} />
             </button>
           </div>
-          <p className="text-gray-600 leading-normal text-[11px]">
-            Il database memorizza solo il <strong>percorso relativo</strong> del file (es: <code className="bg-white px-1 py-0.5 rounded border border-blue-200 font-mono">Disegni/2026/file.pdf</code>).
-            Qui sotto puoi impostare la radice della cartella condivisa usata da <strong>questo specifico PC</strong> (es: <code className="bg-white px-1 py-0.5 rounded border border-blue-200 font-mono">\\192.168.0.123\Preventivi</code> oppure <code className="bg-white px-1 py-0.5 rounded border border-blue-200 font-mono">Z:\NAS</code>).
+
+          <p className="text-gray-600 leading-relaxed text-[11px]">
+            I browser per sicurezza non consentono alle pagine web di leggere in automatico la lettera del disco (es. <code className="bg-white px-1 py-0.5 rounded border border-blue-200 font-mono">Z:\</code>).
+            Per non dover scrivere a mano, puoi **selezionare la cartella dal tuo PC** oppure scegliere una **scorciatoia rapida**:
           </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={pcNasRoot}
-              onChange={(e) => handleSavePcNasRoot(e.target.value)}
-              placeholder="es. \\192.168.0.123\Preventivi"
-              className="flex-1 px-2.5 py-1.5 bg-white border border-blue-300 rounded text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-blue-500"
-            />
+
+          {/* Opzione 1: Selezione con 1 Click via Windows Explorer */}
+          <div className="bg-white p-3 rounded-lg border border-blue-200 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+            <div className="text-xs">
+              <span className="font-bold text-gray-800 block">1. Selezione Visiva Cartella Windows</span>
+              <span className="text-[11px] text-gray-500">Apre la finestra di dialogo Windows per scegliere la cartella sul NAS.</span>
+            </div>
             <button
               type="button"
-              onClick={() => setShowPcNasConfig(false)}
-              className="px-3 py-1.5 bg-blue-600 text-white font-bold rounded text-xs cursor-pointer hover:bg-blue-700"
+              onClick={handleConnectFolder}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
             >
-              Salva
+              <FolderCheck size={16} />
+              <span>Sfoglia Cartella Windows</span>
             </button>
+          </div>
+
+          {/* Opzione 2: Scorciatoie Preimpostate */}
+          <div className="space-y-1.5">
+            <span className="font-bold text-gray-700 text-[11px] block">2. Scorciatoie Rapide (Clicca per applicare subito):</span>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                '\\\\192.168.0.123\\Preventivi',
+                'Z:\\Preventivi',
+                'X:\\NAS\\Preventivi',
+                '\\\\NAS\\Preventivi',
+                'D:\\Allegati'
+              ].map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => handleSavePcNasRoot(preset)}
+                  className={`px-2.5 py-1 rounded text-[11px] font-mono border transition-all cursor-pointer ${
+                    pcNasRoot === preset
+                      ? 'bg-blue-600 text-white border-blue-700 font-bold shadow-2xs'
+                      : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Opzione 3: Campo Personalizzato */}
+          <div className="space-y-1 pt-2 border-t border-blue-200">
+            <span className="font-bold text-gray-700 text-[11px] block">3. Personalizza il percorso per questo PC (o modifica l'esistente):</span>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={pcNasRoot}
+                onChange={(e) => handleSavePcNasRoot(e.target.value)}
+                placeholder="es. \\192.168.0.123\Preventivi o Z:\NAS"
+                className="flex-1 px-2.5 py-1.5 bg-white border border-blue-300 rounded text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-blue-500 text-gray-900"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPcNasConfig(false)}
+                className="px-3.5 py-1.5 bg-blue-600 text-white font-bold rounded text-xs cursor-pointer hover:bg-blue-700 transition-colors"
+              >
+                Conferma
+              </button>
+            </div>
           </div>
         </div>
       )}
