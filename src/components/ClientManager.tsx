@@ -447,7 +447,7 @@ export default function ClientManager({
           <input placeholder="Città" className="p-2 border rounded bg-white text-gray-900" value={clientForm.city} onChange={e => setClientForm({...clientForm, city: e.target.value})} />
           <input placeholder="P.IVA" className="p-2 border rounded bg-white text-gray-900" value={clientForm.vatNumber} onChange={e => setClientForm({...clientForm, vatNumber: e.target.value})} />
           <input placeholder="Codice Univoco" className="p-2 border rounded bg-white text-gray-900" value={clientForm.sdiCode} onChange={e => setClientForm({...clientForm, sdiCode: e.target.value})} />
-          
+
           <div className="col-span-2 pt-2 border-t border-gray-200 space-y-2">
             <label className="block text-sm font-semibold text-gray-700">Allegati Cliente</label>
             <AttachmentManager 
@@ -567,7 +567,7 @@ export default function ClientManager({
               </div>
             )}
 
-            {/* Form Creazione Preventivo Rapido con Allegato */}
+            {/* Form Creazione Preventivo Rapido */}
             {showQuickQuoteForm && (
               <form onSubmit={handleSaveQuickQuote} className="p-5 bg-gradient-to-br from-slate-50 to-blue-50/40 border border-blue-200 rounded-xl space-y-4 shadow-inner">
                 <div className="flex items-center justify-between border-b border-blue-200/60 pb-2">

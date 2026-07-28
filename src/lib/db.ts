@@ -165,12 +165,7 @@ export const syncWithServer = async (force: boolean = false): Promise<void> => {
                 if (item && item.id) {
                   const existing = localMap.get(String(item.id));
                   if (existing) {
-                    const mergedItem = { ...existing, ...item };
-                    // Preserve local allegati if server item doesn't have them
-                    if (Array.isArray(existing.allegati) && existing.allegati.length > 0 && (!Array.isArray(item.allegati) || item.allegati.length === 0)) {
-                      mergedItem.allegati = existing.allegati;
-                    }
-                    return mergedItem;
+                    return { ...existing, ...item };
                   }
                 }
                 return item;
@@ -190,11 +185,7 @@ export const syncWithServer = async (force: boolean = false): Promise<void> => {
                 if (item && item.id) {
                   const existing = mergedMap.get(String(item.id));
                   if (existing) {
-                    const mergedItem = { ...existing, ...item };
-                    if (Array.isArray(existing.allegati) && existing.allegati.length > 0 && (!Array.isArray(item.allegati) || item.allegati.length === 0)) {
-                      mergedItem.allegati = existing.allegati;
-                    }
-                    mergedMap.set(String(item.id), mergedItem);
+                    mergedMap.set(String(item.id), { ...existing, ...item });
                   } else {
                     mergedMap.set(String(item.id), item);
                   }

@@ -11,6 +11,18 @@ export interface ChangelogEntry {
 
 export const changelogData: ChangelogEntry[] = [
   {
+    version: "3.8.5",
+    date: "2026-07-28",
+    title: "Gestionale v3.8.5 - Integrazione Allegati NAS Senza File nel Database",
+    type: "patch",
+    changes: [
+      {
+        category: "feature",
+        text: "Gestione Allegati NAS: Integrazione completa dei componenti di gestione allegati per preventivi e anagrafiche clienti, salvando esclusivamente i collegamenti e i percorsi NAS senza memorizzare file binari nel database."
+      }
+    ]
+  },
+  {
     version: "3.8.0",
     date: "2026-07-27",
     title: "Gestionale v3.8.0 - Sincronizzazione MariaDB Autoritativa e Timeout Allegati",

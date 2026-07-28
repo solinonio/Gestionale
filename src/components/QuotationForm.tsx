@@ -1128,7 +1128,7 @@ export default function QuotationForm(props: { onSave?: () => void, editingQuota
             {activeTab === 'noteCliente' && (
                 <div className="bg-gray-100 p-6 rounded-lg shadow-sm border border-gray-300">
                   <div className='flex justify-end mb-2'>
-                      <button onClick={() => setActiveTab(null as any)} className="text-gray-700 hover:text-gray-900 text-sm">Chiudi</button>
+                      <button onClick={() => setActiveTab(null as any)} className="text-gray-700 hover:text-gray-900 text-sm cursor-pointer">Chiudi</button>
                   </div>
                   <label className="block text-sm font-medium mb-1 text-gray-900">Note Cliente</label>
                   <QuillEditor 

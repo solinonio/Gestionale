@@ -290,7 +290,7 @@ export default function App() {
                 <button 
                   onClick={() => setIsChangelogOpen(true)}
                   className="relative bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm select-none cursor-pointer transition-all flex items-center gap-1 group"
-                  title="Clicca per vedere le novità della versione 3.8.0"
+                  title="Clicca per vedere le novità della versione 3.8.5"
                 >
                   v{CURRENT_VERSION}
                   <span className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[8px] px-1 rounded-full animate-bounce">NEW</span>

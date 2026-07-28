@@ -11,7 +11,7 @@ interface Props {
 export default function ChangelogModal({ isOpen, onClose }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedVersions, setExpandedVersions] = useState<Record<string, boolean>>({
-    "3.8.0": true, // Default expanded
+    "3.8.5": true, // Default expanded
   });
 
   if (!isOpen) return null;
