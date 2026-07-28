@@ -61,7 +61,7 @@ const stripBase64FromValue = (data: any): any => {
         delete cleanAtt.dataUrl;
       }
       if (!cleanAtt.path && cleanAtt.filename) {
-        cleanAtt.path = `allegati/${cleanAtt.filename}`;
+        cleanAtt.path = cleanAtt.filename;
       }
       return cleanAtt;
     });

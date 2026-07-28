@@ -70,7 +70,7 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
     setIsLoadingNasFile(true);
     setNasLiveUrl(null);
 
-    const relPath = previewingAttachment.path || `allegati/${previewingAttachment.filename}`;
+    const relPath = previewingAttachment.path || previewingAttachment.filename;
     getFileFromNas(relPath).then(file => {
       if (isMounted && file) {
         const objectUrl = URL.createObjectURL(file);
@@ -91,7 +91,7 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
   const handleConnectFolder = async () => {
     const handle = await connectNasFolder();
     if (handle && previewingAttachment) {
-      const relPath = previewingAttachment.path || `allegati/${previewingAttachment.filename}`;
+      const relPath = previewingAttachment.path || previewingAttachment.filename;
       const file = await getFileFromNas(relPath);
       if (file) {
         setNasLiveUrl(URL.createObjectURL(file));
@@ -107,7 +107,7 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
       mimeType: att.mimeType || 'application/pdf',
       size: att.size || 0,
       uploadedAt: att.uploadedAt || new Date().toLocaleDateString('it-IT'),
-      path: att.path || `allegati/${att.filename}`
+      path: att.path || att.filename
     };
     if (att.dataUrl && att.dataUrl.startsWith('blob:')) {
       clean.dataUrl = att.dataUrl;
@@ -129,7 +129,7 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
         filename: file.name,
         mimeType: file.type || 'application/pdf',
         size: file.size,
-        path: `allegati/${file.name}`,
+        path: file.name,
         dataUrl: sessionBlobUrl,
         uploadedAt: new Date().toLocaleDateString('it-IT') + ' ' + new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
       });
@@ -274,7 +274,7 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {attachments.map((att) => {
-            const relPath = att.path || `allegati/${att.filename}`;
+            const relPath = att.path || att.filename;
             const fullNasPath = buildFullNasPath(relPath);
 
             return (
@@ -375,7 +375,7 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
                 <div className="min-w-0 max-w-full">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Percorso Completo NAS Network</p>
                   <p className="text-xs font-mono bg-gray-100 px-2 py-1 rounded border border-gray-200 text-gray-800 break-all">
-                    {buildFullNasPath(previewingAttachment.path || `allegati/${previewingAttachment.filename}`)}
+                    {buildFullNasPath(previewingAttachment.path || previewingAttachment.filename)}
                   </p>
                 </div>
               </div>
@@ -417,14 +417,14 @@ export default function AttachmentManager({ attachments = [], onChange, readOnly
                   <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 max-w-lg mx-auto text-left space-y-1 text-xs">
                     <span className="font-bold text-gray-700 block">Percorso Rete Windows (NAS):</span>
                     <code className="block bg-white p-2 rounded border border-gray-300 font-mono text-gray-800 break-all select-all">
-                      {buildFullNasPath(previewingAttachment.path || `allegati/${previewingAttachment.filename}`)}
+                      {buildFullNasPath(previewingAttachment.path || previewingAttachment.filename)}
                     </code>
                   </div>
 
                   <div className="flex flex-wrap justify-center items-center gap-3 pt-2">
                     <button
                       type="button"
-                      onClick={() => handleCopyPath(previewingAttachment.path || `allegati/${previewingAttachment.filename}`, previewingAttachment.id)}
+                      onClick={() => handleCopyPath(previewingAttachment.path || previewingAttachment.filename, previewingAttachment.id)}
                       className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
                     >
                       {copiedId === previewingAttachment.id ? (
